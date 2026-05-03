@@ -9,6 +9,8 @@ import {
   getUserClaimedTaskIds,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
+import { getTaskMedia } from '../../../services/taskMediaService';
+import { getPresignedUrl } from '../../../services/storageService';
 
 // ── Available tasks list ────────────────────────────────────────────────────
 
@@ -68,18 +70,32 @@ export async function handleUserTaskView(ctx: MyContext, taskId: number): Promis
     return;
   }
 
-  const alreadyClaimed = claimedIds.has(task.id);
+  const [alreadyClaimed, taskMediaFiles] = [
+    claimedIds.has(task.id),
+    await getTaskMedia(task.id),
+  ];
+
+  const deadlineLabel = task.deadlineHours % 24 === 0
+    ? `${task.deadlineHours / 24} day${task.deadlineHours / 24 === 1 ? '' : 's'}`
+    : `${task.deadlineHours} hours`;
+
   const text =
     `<b>${task.title}</b>\n\n` +
     (task.description ? `${task.description}\n\n` : '') +
     `🔗 <a href="${task.link}">Open Task Link</a>\n` +
     `💰 Reward: <b>${task.priceUah} UAH</b>\n` +
-    `👥 Available slots: <b>${task.slotsAvailable}</b>` +
+    `👥 Available slots: <b>${task.slotsAvailable}</b>\n` +
+    `⏰ Deadline after claiming: <b>${deadlineLabel}</b>` +
     (alreadyClaimed ? '\n\n✅ <i>You have already claimed this task.</i>' : '');
+
+  const kb = userTaskDetailKeyboard(task.id, alreadyClaimed, task.slotsAvailable > 0);
+  if (taskMediaFiles.length > 0) {
+    kb.row().text(`📎 Help Material (${taskMediaFiles.length})`, `user:task:help:${task.id}`);
+  }
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
-    reply_markup: userTaskDetailKeyboard(task.id, alreadyClaimed, task.slotsAvailable > 0),
+    reply_markup: kb,
     link_preview_options: { is_disabled: true },
   });
 }
@@ -168,12 +184,9 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
     })
     .join('\n');
 
-  // Build keyboard — claimed tasks get a Submit Report button
   const kb = new InlineKeyboard();
   for (const a of assignments) {
-    if (a.status === 'claimed') {
-      kb.text(`📝 Submit: ${a.task.title}`, `user:report:start:${a.id}`).row();
-    }
+    kb.text(`${statusEmoji[a.status] ?? '•'} ${a.task.title}`, `user:assignment:view:${a.id}`).row();
   }
   kb.text('📋 Browse More Tasks', 'user:tasks').row().text('◀ Back', 'user:menu');
 
@@ -181,6 +194,85 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
     `🎯 <b>My Tasks</b> (${assignments.length})\n\n${lines}`,
     { parse_mode: 'HTML', reply_markup: kb },
   );
+}
+
+// ── Assignment detail view ───────────────────────────────────────────────────
+
+export async function handleUserAssignmentView(
+  ctx: MyContext,
+  assignmentId: number,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+
+  const telegramId = ctx.from!.id.toString();
+  const dbUser = await getUserByTelegramId(telegramId);
+  if (!dbUser) return;
+
+  const userAssignments = await getUserAssignments(dbUser.id);
+  const assignment = userAssignments.find((a) => a.id === assignmentId);
+
+  if (!assignment) {
+    await ctx.answerCallbackQuery({ text: '❌ Assignment not found', show_alert: true });
+    return;
+  }
+
+  const task = assignment.task;
+  const statusEmoji: Record<string, string> = { claimed: '⏳', completed: '✅', expired: '❌' };
+  const taskMediaFiles = await getTaskMedia(task.id);
+
+  const deadline = assignment.expiresAt
+    ? assignment.expiresAt.toLocaleString('uk-UA', { timeZone: 'Europe/Kiev' })
+    : '—';
+
+  const text =
+    `<b>${task.title}</b>\n\n` +
+    (task.description ? `📝 ${task.description}\n\n` : '') +
+    `🔗 <a href="${task.link}">Open Task Link</a>\n` +
+    `💰 Reward: <b>${task.priceUah} UAH</b>\n` +
+    `⏰ Deadline: <b>${deadline}</b>\n` +
+    `Status: ${statusEmoji[assignment.status] ?? '•'} <b>${assignment.status}</b>`;
+
+  const kb = new InlineKeyboard();
+  if (assignment.status === 'claimed') {
+    kb.text('📝 Submit Report', `user:report:start:${assignmentId}`).row();
+  }
+  if (taskMediaFiles.length > 0) {
+    kb.text(`📎 Help Material (${taskMediaFiles.length})`, `user:task:help:${task.id}`).row();
+  }
+  kb.text('◀ Back to My Tasks', 'user:my_tasks');
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+    link_preview_options: { is_disabled: true },
+  });
+}
+
+// ── Send task help media to user ─────────────────────────────────────────────
+
+export async function handleUserTaskHelp(ctx: MyContext, taskId: number): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const files = await getTaskMedia(taskId);
+
+  if (files.length === 0) {
+    await ctx.answerCallbackQuery({ text: 'No help material available', show_alert: true });
+    return;
+  }
+
+  for (const f of files) {
+    try {
+      if (f.telegramFileId) {
+        if (f.fileType === 'photo') await ctx.replyWithPhoto(f.telegramFileId);
+        else await ctx.replyWithVideo(f.telegramFileId);
+      } else {
+        const url = await getPresignedUrl(f.storageKey, 3600);
+        await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+      }
+    } catch {
+      const url = await getPresignedUrl(f.storageKey, 3600);
+      await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+    }
+  }
 }
 
 // ── Main menu shortcut ───────────────────────────────────────────────────────

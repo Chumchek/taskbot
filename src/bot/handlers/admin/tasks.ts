@@ -9,6 +9,7 @@ import {
   toggleTaskActive,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
+import { getTaskMedia } from '../../../services/taskMediaService';
 import { isValidUrl, isValidPrice, isValidSlots, isValidDeadlineHours } from '../../../utils/validators';
 
 // ── Admin task list ─────────────────────────────────────────────────────────
@@ -37,7 +38,10 @@ export async function handleAdminTaskList(ctx: MyContext): Promise<void> {
 
 export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promise<void> {
   await ctx.answerCallbackQuery();
-  const task = await getTaskById(taskId);
+  const [task, taskMediaFiles] = await Promise.all([
+    getTaskById(taskId),
+    getTaskMedia(taskId),
+  ]);
 
   if (!task) {
     await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
@@ -45,10 +49,8 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
   }
 
   const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
-  const deadlineLabel =
-    task.deadlineHours % 24 === 0
-      ? `${task.deadlineHours / 24}d`
-      : `${task.deadlineHours}h`;
+  const deadlineLabel = task.deadlineHours % 24 === 0
+    ? `${task.deadlineHours / 24}d` : `${task.deadlineHours}h`;
   const text =
     `<b>${task.title}</b>\n\n` +
     (task.description ? `📝 ${task.description}\n\n` : '') +
@@ -60,7 +62,7 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
-    reply_markup: adminTaskDetailKeyboard(task.id, task.isActive),
+    reply_markup: adminTaskDetailKeyboard(task.id, task.isActive, taskMediaFiles.length),
     link_preview_options: { is_disabled: true },
   });
 }
@@ -80,11 +82,10 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
   });
 
   // Refresh the detail view in-place
+  const [taskMediaFiles] = await Promise.all([getTaskMedia(task.id)]);
   const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
-  const deadlineLabel =
-    task.deadlineHours % 24 === 0
-      ? `${task.deadlineHours / 24}d`
-      : `${task.deadlineHours}h`;
+  const deadlineLabel = task.deadlineHours % 24 === 0
+    ? `${task.deadlineHours / 24}d` : `${task.deadlineHours}h`;
   const text =
     `<b>${task.title}</b>\n\n` +
     (task.description ? `📝 ${task.description}\n\n` : '') +
@@ -96,7 +97,7 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
-    reply_markup: adminTaskDetailKeyboard(task.id, task.isActive),
+    reply_markup: adminTaskDetailKeyboard(task.id, task.isActive, taskMediaFiles.length),
     link_preview_options: { is_disabled: true },
   });
 }

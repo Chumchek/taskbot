@@ -98,6 +98,16 @@ export const payouts = pgTable('payouts', {
   paidAt: timestamp('paid_at'),
 });
 
+export const taskMedia = pgTable('task_media', {
+  id: serial('id').primaryKey(),
+  taskId: integer('task_id').notNull().references(() => tasks.id),
+  storageKey: text('storage_key').notNull(),
+  telegramFileId: text('telegram_file_id'),
+  fileType: text('file_type').notNull(),
+  fileSize: integer('file_size'),
+  uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
+});
+
 // Bot session persistence (replaces in-memory storage)
 export const sessions = pgTable('sessions', {
   key: text('key').primaryKey(),

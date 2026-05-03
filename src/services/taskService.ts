@@ -1,6 +1,7 @@
 import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { assignments, media, reports, tasks } from '../db/schema';
+import { assignments, media, reports, taskMedia, tasks } from '../db/schema';
+import { deleteFile } from './storageService';
 
 export type Task = typeof tasks.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
@@ -68,8 +69,16 @@ export async function deleteTask(taskId: number): Promise<DeleteTaskResult> {
 
   if (activeCount > 0) return { success: false, reason: 'has_active_assignments', count: activeCount };
 
-  // Cascade: media → reports → assignments → task
+  // Delete task media R2 files before the transaction (not atomic, failures are non-critical)
+  const taskMediaFiles = await db.select().from(taskMedia).where(eq(taskMedia.taskId, taskId));
+  for (const f of taskMediaFiles) {
+    try { await deleteFile(f.storageKey); } catch { /* already deleted */ }
+  }
+
+  // Cascade: taskMedia → media → reports → assignments → task
   await db.transaction(async (tx) => {
+    await tx.delete(taskMedia).where(eq(taskMedia.taskId, taskId));
+
     const taskAssignments = await tx
       .select({ id: assignments.id })
       .from(assignments)

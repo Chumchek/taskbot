@@ -57,6 +57,18 @@ import {
   handleAdminPayoutView,
 } from './handlers/admin/payouts';
 
+// Handlers — admin task media
+import {
+  handleAdminTaskMedia,
+  handleAdminTaskMediaStartUpload,
+  handleAdminTaskMediaDone,
+  handleAdminTaskMediaPreview,
+  handleAdminTaskMediaClearConfirm,
+  handleAdminTaskMediaClear,
+  handleTaskMediaPhoto,
+  handleTaskMediaVideo,
+} from './handlers/admin/taskMedia';
+
 // Handlers — user tasks
 import {
   handleUserMenu,
@@ -64,6 +76,8 @@ import {
   handleUserTaskClaim,
   handleUserTaskList,
   handleUserTaskView,
+  handleUserAssignmentView,
+  handleUserTaskHelp,
 } from './handlers/user/tasks';
 
 // Handlers — user reports
@@ -169,6 +183,24 @@ export function createBot(): Bot<MyContext> {
     handleAdminPayoutShowCard(ctx, parseInt(ctx.match[1], 10)),
   );
 
+  // ── Admin task media callbacks ───────────────────────────────────────────────
+  bot.callbackQuery(/^admin:task:media:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskMedia(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^admin:task:media:upload:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskMediaStartUpload(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery('admin:task:media:done', adminOnly, handleAdminTaskMediaDone);
+  bot.callbackQuery(/^admin:task:media:preview:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskMediaPreview(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^admin:task:media:clear_confirm:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskMediaClearConfirm(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^admin:task:media:clear:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskMediaClear(ctx, parseInt(ctx.match[1], 10)),
+  );
+
   // ── User task callbacks ──────────────────────────────────────────────────
   bot.callbackQuery('user:menu', handleUserMenu);
   bot.callbackQuery('user:tasks', handleUserTaskList);
@@ -179,6 +211,12 @@ export function createBot(): Bot<MyContext> {
   );
   bot.callbackQuery(/^user:task:claim:(\d+)$/, (ctx) =>
     handleUserTaskClaim(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^user:assignment:view:(\d+)$/, (ctx) =>
+    handleUserAssignmentView(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^user:task:help:(\d+)$/, (ctx) =>
+    handleUserTaskHelp(ctx, parseInt(ctx.match[1], 10)),
   );
 
   // ── User report callbacks ────────────────────────────────────────────────
@@ -196,16 +234,20 @@ export function createBot(): Bot<MyContext> {
   // ── User balance ─────────────────────────────────────────────────────────
   bot.callbackQuery('user:balance', handleUserBalance);
 
-  // ── Media handlers (report submission) ───────────────────────────────────
+  // ── Media handlers ────────────────────────────────────────────────────────
   bot.on('message:photo', async (ctx) => {
     if (ctx.session.reportStep === 'awaiting_media') {
       await handleReportPhoto(ctx);
+    } else if (ctx.session.taskMediaStep === 'awaiting_media') {
+      await handleTaskMediaPhoto(ctx);
     }
   });
 
   bot.on('message:video', async (ctx) => {
     if (ctx.session.reportStep === 'awaiting_media') {
       await handleReportVideo(ctx);
+    } else if (ctx.session.taskMediaStep === 'awaiting_media') {
+      await handleTaskMediaVideo(ctx);
     }
   });
 

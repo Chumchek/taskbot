@@ -38,6 +38,13 @@ export interface PendingReport {
   promptMsgId?: number;
 }
 
+export interface PendingTaskMedia {
+  taskId: number;
+  taskTitle: string;
+  count: number;
+  promptMsgId?: number;
+}
+
 export interface SessionData {
   // User registration flow
   step: RegistrationStep;
@@ -46,6 +53,10 @@ export interface SessionData {
   // Admin task creation flow
   taskStep?: TaskCreationStep;
   pendingTask?: PendingTask;
+
+  // Admin task media upload flow
+  taskMediaStep?: 'awaiting_media';
+  pendingTaskMedia?: PendingTaskMedia;
 
   // User report submission flow
   reportStep?: ReportStep;

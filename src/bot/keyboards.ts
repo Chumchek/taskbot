@@ -65,10 +65,13 @@ export function adminTaskListKeyboard(tasks: Task[]): InlineKeyboard {
   return kb;
 }
 
-export function adminTaskDetailKeyboard(taskId: number, isActive: boolean): InlineKeyboard {
+export function adminTaskDetailKeyboard(taskId: number, isActive: boolean, mediaCount = 0): InlineKeyboard {
+  const mediaLabel = mediaCount > 0 ? `📎 Help Media (${mediaCount})` : '📎 Add Help Media';
   return new InlineKeyboard()
     .text(isActive ? '🔴 Deactivate' : '🟢 Activate', `admin:task:toggle:${taskId}`)
     .text('🗑 Delete', `admin:task:delete_confirm:${taskId}`)
+    .row()
+    .text(mediaLabel, `admin:task:media:${taskId}`)
     .row()
     .text('◀ Back to Tasks', 'admin:tasks');
 }
