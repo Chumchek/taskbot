@@ -32,18 +32,27 @@ import {
   ADMIN_TASK_LINK_SAVED,
   ADMIN_TASK_PRICE_SAVED,
   ADMIN_TASK_SLOTS_SAVED,
+  ADMIN_TASK_DEADLINE_SAVED,
+  ADMIN_TASK_EXPIRY_STEP,
   ADMIN_TASK_TITLE_TOO_LONG,
   ADMIN_TASK_DESC_TOO_LONG,
   ADMIN_TASK_INVALID_URL,
   ADMIN_TASK_INVALID_PRICE,
   ADMIN_TASK_INVALID_SLOTS,
   ADMIN_TASK_INVALID_DEADLINE,
+  ADMIN_TASK_INVALID_EXPIRY,
   ADMIN_TASK_INCOMPLETE,
   ADMIN_TASK_SUMMARY,
   ADMIN_TASK_CREATED,
   ADMIN_PANEL_HEADER,
   ADMIN_TASK_CREATION_CANCELLED,
 } from '../../../i18n/ru';
+
+function taskExpiresAtLabel(task: { createdAt: Date; taskExpiryHours: number | null }): string | null {
+  if (!task.taskExpiryHours) return null;
+  const expiresAt = new Date(task.createdAt.getTime() + task.taskExpiryHours * 3_600_000);
+  return expiresAt.toLocaleString('ru-RU', { timeZone: 'Europe/Kiev' });
+}
 
 // ── Admin task list ─────────────────────────────────────────────────────────
 
@@ -83,9 +92,10 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
 
   const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
   const dl = deadlineLabel(task.deadlineHours);
+  const expiresAt = taskExpiresAtLabel(task);
   const text = ADMIN_TASK_DETAIL(
     task.title, task.description, task.link, task.priceUah,
-    task.slotsAvailable, task.slotsTotal, dl, status,
+    task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
   );
 
   await ctx.editMessageText(text, {
@@ -112,9 +122,10 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
   const taskMediaFiles = await getTaskMedia(task.id);
   const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
   const dl = deadlineLabel(task.deadlineHours);
+  const expiresAt = taskExpiresAtLabel(task);
   const text = ADMIN_TASK_DETAIL(
     task.title, task.description, task.link, task.priceUah,
-    task.slotsAvailable, task.slotsTotal, dl, status,
+    task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
   );
 
   await ctx.editMessageText(text, {
@@ -280,22 +291,43 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     }
 
     const hours = parseInt(text, 10);
-    const task = { ...pendingTask, deadlineHours: hours };
+    ctx.session.pendingTask = { ...pendingTask, deadlineHours: hours };
+    ctx.session.taskStep = 'awaiting_expiry';
+
+    await ctx.reply(ADMIN_TASK_DEADLINE_SAVED(deadlineLabel(hours)), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text(KB.SKIP_EXPIRY, 'admin:task:skip_expiry')
+        .row()
+        .text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
+    return;
+  }
+
+  if (taskStep === 'awaiting_expiry') {
+    const hours = parseInt(text, 10);
+    if (!Number.isInteger(hours) || hours < 1 || hours > 8760) {
+      await ctx.reply(ADMIN_TASK_INVALID_EXPIRY);
+      return;
+    }
+
+    const task = { ...pendingTask, taskExpiryHours: hours };
     ctx.session.pendingTask = task;
     ctx.session.taskStep = 'confirming';
 
-    const dl = deadlineLabel(hours);
-    const summary = ADMIN_TASK_SUMMARY(
-      task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!, dl,
+    await ctx.reply(
+      ADMIN_TASK_SUMMARY(
+        task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
+        deadlineLabel(task.deadlineHours!), deadlineLabel(hours),
+      ),
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard()
+          .text('✅ Создать задание', 'admin:task:confirm_create')
+          .text(KB.CANCEL, 'admin:task:cancel_create'),
+        link_preview_options: { is_disabled: true },
+      },
     );
-
-    await ctx.reply(summary, {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('✅ Создать задание', 'admin:task:confirm_create')
-        .text(KB.CANCEL, 'admin:task:cancel_create'),
-      link_preview_options: { is_disabled: true },
-    });
   }
 }
 
@@ -307,6 +339,29 @@ export async function handleAdminTaskSkipDesc(ctx: MyContext): Promise<void> {
     parse_mode: 'HTML',
     reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
   });
+}
+
+export async function handleAdminTaskSkipExpiry(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+
+  const { pendingTask = {} } = ctx.session;
+  const task = { ...pendingTask, taskExpiryHours: null };
+  ctx.session.pendingTask = task;
+  ctx.session.taskStep = 'confirming';
+
+  await ctx.editMessageText(
+    ADMIN_TASK_SUMMARY(
+      task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
+      deadlineLabel(task.deadlineHours!), null,
+    ),
+    {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text('✅ Создать задание', 'admin:task:confirm_create')
+        .text(KB.CANCEL, 'admin:task:cancel_create'),
+      link_preview_options: { is_disabled: true },
+    },
+  );
 }
 
 export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void> {
@@ -337,6 +392,7 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
     priceUah: pendingTask.priceUah,
     slotsTotal: pendingTask.slotsTotal,
     deadlineHours: pendingTask.deadlineHours,
+    taskExpiryHours: pendingTask.taskExpiryHours ?? null,
     createdBy: adminUser?.id ?? null,
   });
 

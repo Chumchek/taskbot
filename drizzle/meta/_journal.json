@@ -15,6 +15,13 @@
       "when": 1777821969019,
       "tag": "0001_furry_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777824431020,
+      "tag": "0002_fuzzy_frank_castle",
+      "breakpoints": true
     }
   ]
 }

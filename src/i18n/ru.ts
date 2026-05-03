@@ -101,13 +101,15 @@ export const ADMIN_TASK_DETAIL = (
   slotsTotal: number,
   dl: string,
   status: string,
+  expiresAt?: string | null,
 ) =>
   `<b>${title}</b>\n\n` +
   (description ? `📝 ${description}\n\n` : '') +
   `🔗 <a href="${link}">Ссылка на задание</a>\n` +
   `💰 Оплата: <b>${priceUah} грн</b>\n` +
   `👥 Места: ${slotsAvailable}/${slotsTotal}\n` +
-  `⏰ Дедлайн: <b>${dl}</b>\n` +
+  `⏰ Дедлайн пользователя: <b>${dl}</b>\n` +
+  (expiresAt ? `📅 Задание закрывается: <b>${expiresAt}</b>\n` : '') +
   `Статус: ${status}`;
 
 export const ADMIN_TASK_DELETE_CONFIRM = (title: string) =>
@@ -118,25 +120,33 @@ export const ADMIN_TASK_HAS_ACTIVE_ASSIGNMENTS = (count: number) =>
 
 // Task creation
 export const ADMIN_TASK_CREATE_STEP1 =
-  `➕ <b>Новое задание — Шаг 1/6</b>\n\nВведите <b>название</b> задания:\n<i>(не более 100 символов)</i>`;
+  `➕ <b>Новое задание — Шаг 1/7</b>\n\nВведите <b>название</b> задания:\n<i>(не более 100 символов)</i>`;
 
 export const ADMIN_TASK_CREATE_STEP3 =
-  `<b>Шаг 3/6:</b> Введите <b>ссылку</b> на задание (URL):`;
+  `<b>Шаг 3/7:</b> Введите <b>ссылку</b> на задание (URL):`;
 
 export const ADMIN_TASK_TITLE_SAVED = (title: string) =>
-  `✅ Название: <b>${title}</b>\n\n<b>Шаг 2/6:</b> Введите описание:\n<i>(необязательно, не более 500 символов)</i>`;
+  `✅ Название: <b>${title}</b>\n\n<b>Шаг 2/7:</b> Введите описание:\n<i>(необязательно, не более 500 символов)</i>`;
 
 export const ADMIN_TASK_DESC_SAVED =
-  `✅ Описание сохранено.\n\n<b>Шаг 3/6:</b> Введите <b>ссылку</b> на задание (URL):`;
+  `✅ Описание сохранено.\n\n<b>Шаг 3/7:</b> Введите <b>ссылку</b> на задание (URL):`;
 
 export const ADMIN_TASK_LINK_SAVED =
-  `✅ Ссылка сохранена.\n\n<b>Шаг 4/6:</b> Введите <b>сумму оплаты</b> в гривнах:\n<i>(например: 50 или 75.50)</i>`;
+  `✅ Ссылка сохранена.\n\n<b>Шаг 4/7:</b> Введите <b>сумму оплаты</b> в гривнах:\n<i>(например: 50 или 75.50)</i>`;
 
 export const ADMIN_TASK_PRICE_SAVED = (price: string) =>
-  `✅ Оплата: <b>${price} грн</b>\n\n<b>Шаг 5/6:</b> Введите количество <b>доступных мест</b>:\n<i>(сколько пользователей могут взять это задание)</i>`;
+  `✅ Оплата: <b>${price} грн</b>\n\n<b>Шаг 5/7:</b> Введите количество <b>доступных мест</b>:\n<i>(сколько пользователей могут взять это задание)</i>`;
 
 export const ADMIN_TASK_SLOTS_SAVED = (slots: string) =>
-  `✅ Мест: <b>${slots}</b>\n\n<b>Шаг 6/6:</b> Введите <b>дедлайн</b> в часах:\n<i>(сколько времени есть после получения задания, напр. 24, 48, 72)</i>`;
+  `✅ Мест: <b>${slots}</b>\n\n<b>Шаг 6/7:</b> Введите <b>дедлайн пользователя</b> в часах:\n<i>(сколько времени есть у пользователя после получения задания, напр. 1, 24, 48)</i>`;
+
+export const ADMIN_TASK_DEADLINE_SAVED = (dl: string) =>
+  `✅ Дедлайн пользователя: <b>${dl}</b>\n\n<b>Шаг 7/7:</b> Введите <b>срок действия задания</b> в часах:\n<i>(через сколько часов задание закроется для новых участников, напр. 48, 72)</i>\n<i>Пропустите, если задание бессрочное.</i>`;
+
+export const ADMIN_TASK_EXPIRY_STEP =
+  `<b>Шаг 7/7:</b> Введите <b>срок действия задания</b> в часах:\n<i>(через сколько часов задание закроется для новых участников)</i>\n<i>Пропустите, если задание бессрочное.</i>`;
+
+export const ADMIN_TASK_INVALID_EXPIRY = '❌ Неверное значение. Введите количество часов от 1 до 8760 (1 год):';
 
 export const ADMIN_TASK_TITLE_TOO_LONG = '❌ Название слишком длинное (макс. 100 символов). Попробуйте ещё раз:';
 export const ADMIN_TASK_DESC_TOO_LONG = '❌ Описание слишком длинное (макс. 500 символов). Попробуйте ещё раз:';
@@ -153,6 +163,7 @@ export const ADMIN_TASK_SUMMARY = (
   priceUah: string,
   slotsTotal: number,
   dl: string,
+  expiryLabel?: string | null,
 ) =>
   `📋 <b>Итог задания</b>\n\n` +
   `Название: <b>${title}</b>\n` +
@@ -160,8 +171,9 @@ export const ADMIN_TASK_SUMMARY = (
   `Ссылка: <a href="${link}">${link}</a>\n` +
   `Оплата: <b>${priceUah} грн</b>\n` +
   `Мест: <b>${slotsTotal}</b>\n` +
-  `Дедлайн: <b>${dl}</b>\n\n` +
-  `Создать задание?`;
+  `Дедлайн пользователя: <b>${dl}</b>\n` +
+  (expiryLabel ? `Срок действия: <b>${expiryLabel}</b>\n` : `Срок действия: <i>бессрочно</i>\n`) +
+  `\nСоздать задание?`;
 
 export const ADMIN_TASK_CREATED = (title: string, priceUah: string, slotsTotal: number) =>
   `✅ <b>Задание создано!</b>\n\n<b>${title}</b>\n💰 ${priceUah} грн | 👥 ${slotsTotal} мест`;
@@ -494,6 +506,7 @@ export const KB = {
   ADD_MEDIA: '➕ Добавить материалы',
   PREVIEW: '👁 Предпросмотр',
   REMOVE_ALL: '🗑 Удалить все',
+  SKIP_EXPIRY: 'Пропустить (бессрочно) ▶',
   BACK_REPORTS_ADMIN: '📊 К отчётам',
   BACK_ADMIN_MENU: '◀ Панель администратора',
   CANCEL_REJECT: '◀ Отмена',

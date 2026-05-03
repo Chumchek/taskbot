@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { assignments, media, reports, taskMedia, tasks } from '../db/schema';
 import { deleteFile } from './storageService';
@@ -13,6 +13,7 @@ export interface CreateTaskInput {
   priceUah: string;
   slotsTotal: number;
   deadlineHours: number;
+  taskExpiryHours?: number | null;
   createdBy?: number | null;
 }
 
@@ -162,4 +163,21 @@ export async function claimTask(userId: number, taskId: number): Promise<ClaimRe
 
     return { success: true, assignment };
   });
+}
+
+// Deactivates tasks whose taskExpiryHours has elapsed since creation.
+// Returns the number of tasks deactivated.
+export async function autoExpireTasks(): Promise<number> {
+  const result = await db
+    .update(tasks)
+    .set({ isActive: false })
+    .where(
+      and(
+        eq(tasks.isActive, true),
+        isNotNull(tasks.taskExpiryHours),
+        sql`${tasks.createdAt} + (${tasks.taskExpiryHours} || ' hours')::interval <= NOW()`,
+      ),
+    )
+    .returning({ id: tasks.id });
+  return result.length;
 }

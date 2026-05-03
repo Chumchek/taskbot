@@ -33,6 +33,7 @@ import {
   handleAdminTaskDeleteConfirm,
   handleAdminTaskList,
   handleAdminTaskSkipDesc,
+  handleAdminTaskSkipExpiry,
   handleAdminTaskToggle,
   handleAdminTaskView,
   handleTaskCreationText,
@@ -135,6 +136,7 @@ export function createBot(): Bot<MyContext> {
   bot.callbackQuery('admin:tasks', adminOnly, handleAdminTaskList);
   bot.callbackQuery('admin:task:create', adminOnly, handleAdminTaskCreate);
   bot.callbackQuery('admin:task:skip_desc', adminOnly, handleAdminTaskSkipDesc);
+  bot.callbackQuery('admin:task:skip_expiry', adminOnly, handleAdminTaskSkipExpiry);
   bot.callbackQuery('admin:task:confirm_create', adminOnly, handleAdminTaskConfirmCreate);
   bot.callbackQuery('admin:task:cancel_create', adminOnly, handleAdminTaskCancelCreate);
 

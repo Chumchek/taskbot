@@ -192,7 +192,12 @@ async function processMediaFile(
       fileType === 'photo'
         ? USER_REPORT_PHOTO_RECEIVED(fileCount, MAX_FILES)
         : USER_REPORT_VIDEO_RECEIVED(fileCount, MAX_FILES);
-    await ctx.reply(received);
+    await ctx.reply(received, {
+      reply_markup: new InlineKeyboard()
+        .text(USER_REPORT_SUBMIT_BTN(fileCount), 'user:report:submit')
+        .row()
+        .text(KB.CANCEL, 'user:report:cancel'),
+    });
   } catch (err) {
     console.error('Media upload error:', err);
     await ctx.reply(USER_REPORT_UPLOAD_FAILED);

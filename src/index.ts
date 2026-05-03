@@ -4,8 +4,10 @@ import { config } from './config';
 import { createBot } from './bot';
 import { expireAssignments } from './jobs/expireAssignments';
 import { cleanupApprovedReports } from './jobs/cleanupApprovedReports';
+import { expireTasks } from './jobs/expireTasks';
 
 const EXPIRE_INTERVAL_MS = 5 * 60 * 1000;
+const EXPIRE_TASKS_INTERVAL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function main() {
@@ -14,6 +16,10 @@ async function main() {
   // Run assignment expiry once at startup, then every 5 minutes
   expireAssignments(bot.api).catch(console.error);
   setInterval(() => expireAssignments(bot.api).catch(console.error), EXPIRE_INTERVAL_MS);
+
+  // Auto-deactivate tasks past their taskExpiryHours, every 30 minutes
+  expireTasks().catch(console.error);
+  setInterval(() => expireTasks().catch(console.error), EXPIRE_TASKS_INTERVAL_MS);
 
   // Run media/record cleanup once at startup, then every 24 hours
   cleanupApprovedReports().catch(console.error);
