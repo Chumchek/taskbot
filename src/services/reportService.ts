@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { assignments, media, reports, tasks, users } from '../db/schema';
 
@@ -196,4 +196,36 @@ export async function rejectReport(
     userTelegramId: row.user.telegramId,
     taskTitle: row.task.title,
   };
+}
+
+// ── User-facing report list ──────────────────────────────────────────────────
+
+export interface UserReportSummary {
+  reportId: number;
+  status: 'pending' | 'approved' | 'rejected';
+  taskTitle: string;
+  priceUah: string;
+  adminComment: string | null;
+  submittedAt: Date;
+  reviewedAt: Date | null;
+}
+
+export async function getUserReports(userId: number): Promise<UserReportSummary[]> {
+  const rows = await db
+    .select({
+      reportId: reports.id,
+      status: reports.status,
+      taskTitle: tasks.title,
+      priceUah: tasks.priceUah,
+      adminComment: reports.adminComment,
+      submittedAt: reports.submittedAt,
+      reviewedAt: reports.reviewedAt,
+    })
+    .from(reports)
+    .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
+    .innerJoin(tasks, eq(assignments.taskId, tasks.id))
+    .where(eq(assignments.userId, userId))
+    .orderBy(desc(reports.submittedAt));
+
+  return rows as UserReportSummary[];
 }

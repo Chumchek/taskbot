@@ -44,7 +44,9 @@ export function adminMenuKeyboard(): InlineKeyboard {
     .text('📋 Tasks', 'admin:tasks')
     .text('📊 Reports', 'admin:reports')
     .row()
-    .text('💰 Payouts', 'admin:payouts');
+    .text('💰 Payouts', 'admin:payouts')
+    .row()
+    .text('👤 User Menu', 'user:menu');
 }
 
 export function approveUserKeyboard(telegramId: string): InlineKeyboard {

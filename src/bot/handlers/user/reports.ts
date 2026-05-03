@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
 import { getUserByTelegramId } from '../../../services/userService';
 import { getTaskById, getUserAssignments } from '../../../services/taskService';
-import { createReport, addReportMedia } from '../../../services/reportService';
+import { createReport, addReportMedia, getUserReports } from '../../../services/reportService';
 import {
   downloadTelegramFile,
   makeStorageKey,
@@ -253,5 +253,93 @@ export async function handleReportCancel(ctx: MyContext): Promise<void> {
 
   await ctx.editMessageText('❌ Report submission cancelled.', {
     reply_markup: new InlineKeyboard().text('◀ My Tasks', 'user:my_tasks'),
+  });
+}
+
+// ── My reports list ──────────────────────────────────────────────────────────
+
+const STATUS_EMOJI: Record<string, string> = {
+  pending: '⏳',
+  approved: '✅',
+  rejected: '❌',
+};
+
+export async function handleUserReports(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+
+  const telegramId = ctx.from!.id.toString();
+  const dbUser = await getUserByTelegramId(telegramId);
+  if (!dbUser) return;
+
+  const userReports = await getUserReports(dbUser.id);
+
+  if (userReports.length === 0) {
+    await ctx.editMessageText(
+      `📊 <b>My Reports</b>\n\nYou haven't submitted any reports yet.`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard()
+          .text('🎯 My Tasks', 'user:my_tasks')
+          .row()
+          .text('◀ Back', 'user:menu'),
+      },
+    );
+    return;
+  }
+
+  const kb = new InlineKeyboard();
+  for (const r of userReports) {
+    const emoji = STATUS_EMOJI[r.status] ?? '•';
+    kb.text(`${emoji} ${r.taskTitle}`, `user:report:detail:${r.reportId}`).row();
+  }
+  kb.text('◀ Back', 'user:menu');
+
+  const lines = userReports
+    .map((r) => `${STATUS_EMOJI[r.status] ?? '•'} <b>${r.taskTitle}</b> — ${r.status}`)
+    .join('\n');
+
+  await ctx.editMessageText(
+    `📊 <b>My Reports</b> (${userReports.length})\n\n${lines}`,
+    { parse_mode: 'HTML', reply_markup: kb },
+  );
+}
+
+// ── Report detail (user view) ────────────────────────────────────────────────
+
+export async function handleUserReportDetail(ctx: MyContext, reportId: number): Promise<void> {
+  await ctx.answerCallbackQuery();
+
+  const telegramId = ctx.from!.id.toString();
+  const dbUser = await getUserByTelegramId(telegramId);
+  if (!dbUser) return;
+
+  const userReports = await getUserReports(dbUser.id);
+  const report = userReports.find((r) => r.reportId === reportId);
+
+  if (!report) {
+    await ctx.answerCallbackQuery({ text: '❌ Report not found', show_alert: true });
+    return;
+  }
+
+  const emoji = STATUS_EMOJI[report.status] ?? '•';
+  const submittedDate = report.submittedAt.toLocaleDateString('uk-UA');
+
+  let text =
+    `${emoji} <b>Report — ${report.taskTitle}</b>\n\n` +
+    `Status: <b>${report.status}</b>\n` +
+    `Submitted: ${submittedDate}\n` +
+    `Reward: <b>${report.priceUah} UAH</b>`;
+
+  if (report.status === 'rejected' && report.adminComment) {
+    text += `\n\n💬 <b>Admin comment:</b>\n${report.adminComment}`;
+  }
+
+  if (report.status === 'approved') {
+    text += `\n\n✅ <i>Payment will be processed once your balance reaches 200 UAH.</i>`;
+  }
+
+  await ctx.editMessageText(text, {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard().text('◀ Back to Reports', 'user:reports'),
   });
 }

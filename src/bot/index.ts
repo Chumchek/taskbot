@@ -73,6 +73,8 @@ import {
   handleReportStart,
   handleReportSubmit,
   handleReportVideo,
+  handleUserReports,
+  handleUserReportDetail,
 } from './handlers/user/reports';
 
 // Handlers — user balance
@@ -180,6 +182,11 @@ export function createBot(): Bot<MyContext> {
   );
 
   // ── User report callbacks ────────────────────────────────────────────────
+  bot.callbackQuery('user:reports', handleUserReports);
+
+  bot.callbackQuery(/^user:report:detail:(\d+)$/, (ctx) =>
+    handleUserReportDetail(ctx, parseInt(ctx.match[1], 10)),
+  );
   bot.callbackQuery(/^user:report:start:(\d+)$/, (ctx) =>
     handleReportStart(ctx, parseInt(ctx.match[1], 10)),
   );
