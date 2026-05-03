@@ -1,4 +1,4 @@
-import { Bot, session } from 'grammy';
+import { Bot, GrammyError, session } from 'grammy';
 import { config } from '../config';
 import { MyContext, SessionData } from './context';
 import { makeSessionStorage } from '../db/sessionStore';
@@ -280,12 +280,22 @@ export function createBot(): Bot<MyContext> {
 
   // ── Error handler ────────────────────────────────────────────────────────
   bot.catch((err) => {
+    if (err.error instanceof GrammyError) {
+      const desc = err.error.description;
+      // Double-click or webhook retry delivered the same update twice — harmless
+      if (desc.includes('message is not modified')) return;
+      if (desc.includes('query is too old')) return;
+    }
     console.error(`[update ${err.ctx.update.update_id}]`, err.error);
-    // Swallow the error so the process doesn't crash on unhandled rejections
   });
 
   // Safety net — prevent any stray unhandled rejections from killing the process
   process.on('unhandledRejection', (reason) => {
+    if (reason instanceof GrammyError) {
+      const desc = reason.description;
+      if (desc.includes('message is not modified')) return;
+      if (desc.includes('query is too old')) return;
+    }
     console.error('[unhandledRejection]', reason);
   });
 
