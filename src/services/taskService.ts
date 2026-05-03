@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { assignments, tasks } from '../db/schema';
+import { assignments, media, reports, tasks } from '../db/schema';
 
 export type Task = typeof tasks.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
@@ -50,9 +50,51 @@ export async function toggleTaskActive(taskId: number): Promise<Task | undefined
   return updated;
 }
 
-export async function deleteTask(taskId: number): Promise<boolean> {
-  const result = await db.delete(tasks).where(eq(tasks.id, taskId)).returning();
-  return result.length > 0;
+export type DeleteTaskResult =
+  | { success: true }
+  | { success: false; reason: 'not_found' | 'has_active_assignments'; count: number };
+
+// Deletes a task and all associated data (assignments, reports, media rows).
+// R2 files are NOT deleted here — the daily cleanup job handles those.
+// Blocked if any assignment is still in 'claimed' state (user actively working).
+export async function deleteTask(taskId: number): Promise<DeleteTaskResult> {
+  const [existing] = await db.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId));
+  if (!existing) return { success: false, reason: 'not_found', count: 0 };
+
+  const [{ activeCount }] = await db
+    .select({ activeCount: sql<number>`cast(count(*) as int)` })
+    .from(assignments)
+    .where(and(eq(assignments.taskId, taskId), eq(assignments.status, 'claimed')));
+
+  if (activeCount > 0) return { success: false, reason: 'has_active_assignments', count: activeCount };
+
+  // Cascade: media → reports → assignments → task
+  await db.transaction(async (tx) => {
+    const taskAssignments = await tx
+      .select({ id: assignments.id })
+      .from(assignments)
+      .where(eq(assignments.taskId, taskId));
+
+    if (taskAssignments.length > 0) {
+      const assignmentIds = taskAssignments.map((a) => a.id);
+
+      const taskReports = await tx
+        .select({ id: reports.id })
+        .from(reports)
+        .where(inArray(reports.assignmentId, assignmentIds));
+
+      if (taskReports.length > 0) {
+        await tx.delete(media).where(inArray(media.reportId, taskReports.map((r) => r.id)));
+        await tx.delete(reports).where(inArray(reports.id, taskReports.map((r) => r.id)));
+      }
+
+      await tx.delete(assignments).where(inArray(assignments.id, assignmentIds));
+    }
+
+    await tx.delete(tasks).where(eq(tasks.id, taskId));
+  });
+
+  return { success: true };
 }
 
 // Returns task IDs the user has already claimed or completed.

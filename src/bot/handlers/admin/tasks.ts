@@ -124,10 +124,17 @@ export async function handleAdminTaskDeleteConfirm(ctx: MyContext, taskId: numbe
 }
 
 export async function handleAdminTaskDelete(ctx: MyContext, taskId: number): Promise<void> {
-  const deleted = await deleteTask(taskId);
+  const result = await deleteTask(taskId);
 
-  if (!deleted) {
-    await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+  if (!result.success) {
+    if (result.reason === 'has_active_assignments') {
+      await ctx.answerCallbackQuery({
+        text: `❌ ${result.count} user(s) are actively working on this task. Deactivate it and wait for them to finish or expire (up to 24h).`,
+        show_alert: true,
+      });
+    } else {
+      await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+    }
     return;
   }
 

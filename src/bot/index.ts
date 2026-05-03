@@ -237,6 +237,12 @@ export function createBot(): Bot<MyContext> {
   // ── Error handler ────────────────────────────────────────────────────────
   bot.catch((err) => {
     console.error(`[update ${err.ctx.update.update_id}]`, err.error);
+    // Swallow the error so the process doesn't crash on unhandled rejections
+  });
+
+  // Safety net — prevent any stray unhandled rejections from killing the process
+  process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
   });
 
   return bot;
