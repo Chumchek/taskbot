@@ -1,4 +1,4 @@
-import { Bot, GrammyError, session } from 'grammy';
+import { Bot, BotError, GrammyError, session } from 'grammy';
 import { config } from '../config';
 import { MyContext, SessionData } from './context';
 import { makeSessionStorage } from '../db/sessionStore';
@@ -291,10 +291,14 @@ export function createBot(): Bot<MyContext> {
 
   // Safety net — prevent any stray unhandled rejections from killing the process
   process.on('unhandledRejection', (reason) => {
-    if (reason instanceof GrammyError) {
-      const desc = reason.description;
-      if (desc.includes('message is not modified')) return;
-      if (desc.includes('query is too old')) return;
+    // Unhandled rejections from grammY arrive as BotError wrapping a GrammyError
+    const gramErr =
+      reason instanceof GrammyError ? reason :
+      reason instanceof BotError && reason.error instanceof GrammyError ? reason.error :
+      null;
+    if (gramErr) {
+      if (gramErr.description.includes('message is not modified')) return;
+      if (gramErr.description.includes('query is too old')) return;
     }
     console.error('[unhandledRejection]', reason);
   });
