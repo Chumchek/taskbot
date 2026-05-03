@@ -3,6 +3,7 @@ import { Api } from 'grammy';
 import { db } from '../db';
 import { assignments, tasks, users } from '../db/schema';
 import { cleanupOldSessions } from '../db/sessionStore';
+import { deadlineLabel } from '../i18n/ru';
 
 // Finds all claimed assignments past their deadline, marks them expired,
 // and restores the slot on the corresponding task.
@@ -15,6 +16,7 @@ export async function expireAssignments(api?: Api): Promise<void> {
       id: assignments.id,
       taskId: assignments.taskId,
       taskTitle: tasks.title,
+      taskDeadlineHours: tasks.deadlineHours,
       userTelegramId: users.telegramId,
     })
     .from(assignments)
@@ -52,9 +54,9 @@ export async function expireAssignments(api?: Api): Promise<void> {
         try {
           await api.sendMessage(
             a.userTelegramId,
-            `⏰ <b>Assignment expired</b>\n\n` +
-              `Your 24-hour window for <b>${a.taskTitle}</b> has passed.\n\n` +
-              `The slot has been released. You can claim the task again if slots are still available.`,
+            `⏰ <b>Время вышло</b>\n\n` +
+              `Ваше время (${deadlineLabel(a.taskDeadlineHours)}) на выполнение задания <b>${a.taskTitle}</b> истекло.\n\n` +
+              `Место освобождено. Вы можете взять задание снова, если ещё есть свободные места.`,
             { parse_mode: 'HTML' },
           );
         } catch {
