@@ -1,4 +1,3 @@
-import { InlineKeyboard } from 'grammy';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { encrypt, maskCard } from '../../services/crypto';
@@ -9,6 +8,14 @@ import {
   registrationStep1Keyboard,
   registrationStep2Keyboard,
 } from '../keyboards';
+import {
+  REG_STEP1_BINANCE,
+  REG_STEP2_CARD,
+  REG_INVALID_CARD,
+  REG_MUST_PROVIDE_PAYMENT,
+  REG_SUBMITTED,
+  REG_ADMIN_NEW_USER,
+} from '../../i18n/ru';
 
 export async function handleRegistrationText(ctx: MyContext): Promise<void> {
   const text = ctx.message?.text?.trim();
@@ -19,18 +26,17 @@ export async function handleRegistrationText(ctx: MyContext): Promise<void> {
   if (step === 'awaiting_binance') {
     ctx.session.pendingBinanceId = text;
     ctx.session.step = 'awaiting_card';
-    await ctx.reply(
-      `<b>Step 2/2:</b> Enter your <b>bank card number</b> (16 digits):\n` +
-        `<i>(spaces are OK, e.g. 1234 5678 9012 3456)</i>`,
-      { parse_mode: 'HTML', reply_markup: registrationStep2Keyboard() },
-    );
+    await ctx.reply(REG_STEP2_CARD, {
+      parse_mode: 'HTML',
+      reply_markup: registrationStep2Keyboard(),
+    });
     return;
   }
 
   if (step === 'awaiting_card') {
     const digits = text.replace(/\s+/g, '');
     if (!/^\d{16}$/.test(digits)) {
-      await ctx.reply('❌ Invalid card number. Please enter exactly 16 digits (spaces are OK):');
+      await ctx.reply(REG_INVALID_CARD);
       return;
     }
     await completeRegistration(ctx, ctx.session.pendingBinanceId, digits);
@@ -62,7 +68,7 @@ export async function completeRegistration(
 
   const paymentLines = [
     binanceId ? `Binance ID: <code>${binanceId}</code>` : null,
-    cardNumber ? `Card: <code>${maskCard(cardNumber)}</code>` : null,
+    cardNumber ? `Карта: <code>${maskCard(cardNumber)}</code>` : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -71,37 +77,28 @@ export async function completeRegistration(
     try {
       await ctx.api.sendMessage(
         adminId,
-        `🆕 <b>New user registration</b>\n\n` +
-          `User: ${userName}\n` +
-          `Telegram ID: <code>${telegramId}</code>\n` +
-          `${paymentLines}`,
+        REG_ADMIN_NEW_USER(userName, telegramId, paymentLines),
         {
           parse_mode: 'HTML',
           reply_markup: approveUserKeyboard(telegramId),
         },
       );
     } catch {
-      // Admin may have not started the bot
+      // Admin may not have started the bot
     }
   }
 
-  await ctx.reply(
-    `✅ <b>Registration submitted!</b>\n\n` +
-      `An admin will review your application. You will be notified once approved.`,
-    { parse_mode: 'HTML' },
-  );
+  await ctx.reply(REG_SUBMITTED, { parse_mode: 'HTML' });
 }
 
-// Callback handlers for registration inline buttons
 export async function handleRegSkipBinance(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
   ctx.session.step = 'awaiting_card';
   ctx.session.pendingBinanceId = undefined;
-  await ctx.editMessageText(
-    `<b>Step 2/2:</b> Enter your <b>bank card number</b> (16 digits):\n` +
-      `<i>(spaces are OK, e.g. 1234 5678 9012 3456)</i>`,
-    { parse_mode: 'HTML', reply_markup: registrationStep2Keyboard() },
-  );
+  await ctx.editMessageText(REG_STEP2_CARD, {
+    parse_mode: 'HTML',
+    reply_markup: registrationStep2Keyboard(),
+  });
 }
 
 export async function handleRegSkipCard(ctx: MyContext): Promise<void> {
@@ -109,11 +106,10 @@ export async function handleRegSkipCard(ctx: MyContext): Promise<void> {
 
   if (!ctx.session.pendingBinanceId) {
     ctx.session.step = 'awaiting_binance';
-    await ctx.editMessageText(
-      `❌ You must provide at least one payment method.\n\n` +
-        `<b>Step 1/2:</b> Enter your <b>Binance Pay ID</b>:`,
-      { parse_mode: 'HTML', reply_markup: registrationStep1Keyboard() },
-    );
+    await ctx.editMessageText(REG_MUST_PROVIDE_PAYMENT, {
+      parse_mode: 'HTML',
+      reply_markup: registrationStep1Keyboard(),
+    });
     return;
   }
 
@@ -124,9 +120,8 @@ export async function handleRegBackToBinance(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
   ctx.session.step = 'awaiting_binance';
   ctx.session.pendingBinanceId = undefined;
-  await ctx.editMessageText(
-    `<b>Step 1/2:</b> Enter your <b>Binance Pay ID</b>:\n` +
-      `<i>(9-digit number from your Binance → Pay → Receive screen)</i>`,
-    { parse_mode: 'HTML', reply_markup: registrationStep1Keyboard() },
-  );
+  await ctx.editMessageText(REG_STEP1_BINANCE, {
+    parse_mode: 'HTML',
+    reply_markup: registrationStep1Keyboard(),
+  });
 }

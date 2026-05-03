@@ -8,6 +8,21 @@ import {
   rejectReport,
 } from '../../../services/reportService';
 import { getUserByTelegramId } from '../../../services/userService';
+import {
+  KB,
+  ADMIN_NO_PENDING_REPORTS,
+  ADMIN_REPORTS_HEADER,
+  ADMIN_REPORT_NOT_FOUND,
+  ADMIN_REPORT_ALREADY_REVIEWED,
+  ADMIN_REPORT_DETAIL,
+  ADMIN_REPORT_APPROVED_LABEL,
+  ADMIN_REPORT_APPROVED_TEXT,
+  ADMIN_REPORT_APPROVED_NOTIFY,
+  ADMIN_REPORT_REJECT_ASK,
+  ADMIN_REPORT_REJECTED_LABEL,
+  ADMIN_REPORT_REJECTED_TEXT,
+  ADMIN_REPORT_REJECTED_NOTIFY,
+} from '../../../i18n/ru';
 
 // ── Pending reports list ────────────────────────────────────────────────────
 
@@ -17,7 +32,7 @@ export async function handleAdminReportList(ctx: MyContext): Promise<void> {
   const pending = await getPendingReports();
 
   if (pending.length === 0) {
-    await ctx.editMessageText('✅ No pending reports.', { reply_markup: adminMenuKeyboard() });
+    await ctx.editMessageText(ADMIN_NO_PENDING_REPORTS, { reply_markup: adminMenuKeyboard() });
     return;
   }
 
@@ -28,12 +43,12 @@ export async function handleAdminReportList(ctx: MyContext): Promise<void> {
       `admin:report:view:${item.report.id}`,
     ).row();
   }
-  kb.text('◀ Back', 'admin:menu');
+  kb.text(KB.BACK, 'admin:menu');
 
-  await ctx.editMessageText(
-    `📊 <b>Pending Reports</b> (${pending.length})`,
-    { parse_mode: 'HTML', reply_markup: kb },
-  );
+  await ctx.editMessageText(ADMIN_REPORTS_HEADER(pending.length), {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+  });
 }
 
 // ── View report detail + forward media ─────────────────────────────────────
@@ -44,34 +59,33 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
   const item = await getReportWithContext(reportId);
 
   if (!item) {
-    await ctx.answerCallbackQuery({ text: '❌ Report not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_REPORT_NOT_FOUND, show_alert: true });
     return;
   }
 
-  const fileWord = item.mediaFiles.length === 1 ? 'file' : 'files';
-  const submittedAt = item.report.submittedAt.toLocaleString('uk-UA', {
+  const submittedAt = item.report.submittedAt.toLocaleString('ru-RU', {
     timeZone: 'Europe/Kiev',
   });
 
   await ctx.editMessageText(
-    `📊 <b>Report #${reportId}</b>\n\n` +
-      `Task: <b>${item.taskTitle}</b>\n` +
-      `User: ${item.userName}\n` +
-      `Reward: <b>${item.priceUah} UAH</b>\n` +
-      `Submitted: ${submittedAt}\n` +
-      `Files: ${item.mediaFiles.length} ${fileWord}\n\n` +
-      `<i>Files will be sent below. Use the buttons to approve or reject.</i>`,
+    ADMIN_REPORT_DETAIL(
+      reportId,
+      item.taskTitle,
+      item.userName,
+      item.priceUah,
+      submittedAt,
+      item.mediaFiles.length,
+    ),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('✅ Approve', `admin:report:approve:${reportId}`)
-        .text('❌ Reject', `admin:report:reject_ask:${reportId}`)
+        .text('✅ Одобрить', `admin:report:approve:${reportId}`)
+        .text('❌ Отклонить', `admin:report:reject_ask:${reportId}`)
         .row()
-        .text('◀ Back to Reports', 'admin:reports'),
+        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports'),
     },
   );
 
-  // Forward each media file to the admin
   for (const file of item.mediaFiles) {
     if (!file.telegramFileId) continue;
     try {
@@ -81,10 +95,9 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
         await ctx.replyWithVideo(file.telegramFileId);
       }
     } catch {
-      // file_id expired or unavailable — send presigned URL fallback
       const { getPresignedUrl } = await import('../../../services/storageService');
       const url = await getPresignedUrl(file.storageKey, 600);
-      await ctx.reply(`🔗 <a href="${url}">View file (expires in 10 min)</a>`, {
+      await ctx.reply(`🔗 <a href="${url}">Открыть файл (ссылка на 10 мин.)</a>`, {
         parse_mode: 'HTML',
       });
     }
@@ -100,33 +113,33 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
   const result = await approveReport(reportId, adminUser?.id ?? 0);
 
   if (!result) {
-    await ctx.answerCallbackQuery({ text: '❌ Report not found or already reviewed', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_REPORT_ALREADY_REVIEWED, show_alert: true });
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: '✅ Report approved!' });
+  await ctx.answerCallbackQuery({ text: ADMIN_REPORT_APPROVED_LABEL });
 
   await ctx.editMessageText(
-    `✅ <b>Report #${reportId} approved</b>\n\n` +
-      `Task: ${result.taskTitle}\n` +
-      `User: ${result.userTelegramId}\n` +
-      `+${result.priceUah} UAH credited | New balance: ${result.newBalance} UAH`,
+    ADMIN_REPORT_APPROVED_TEXT(
+      reportId,
+      result.taskTitle,
+      result.userTelegramId,
+      result.priceUah,
+      result.newBalance,
+    ),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('📊 Back to Reports', 'admin:reports')
+        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
         .row()
-        .text('◀ Admin Menu', 'admin:menu'),
+        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
     },
   );
 
   try {
     await ctx.api.sendMessage(
       result.userTelegramId,
-      `🎉 <b>Report approved!</b>\n\n` +
-        `Task: <b>${result.taskTitle}</b>\n` +
-        `Reward: <b>+${result.priceUah} UAH</b>\n` +
-        `Balance: <b>${result.newBalance} UAH</b>`,
+      ADMIN_REPORT_APPROVED_NOTIFY(result.taskTitle, result.priceUah, result.newBalance),
       { parse_mode: 'HTML' },
     );
   } catch {
@@ -141,20 +154,16 @@ export async function handleAdminReportRejectAsk(ctx: MyContext, reportId: numbe
 
   ctx.session.adminRejectReportId = reportId;
 
-  await ctx.editMessageText(
-    `❌ <b>Reject Report #${reportId}</b>\n\n` +
-      `Send a reason for rejection (optional), or press <b>Skip</b> to reject without comment.`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('Skip (no comment)', `admin:report:reject:${reportId}`)
-        .row()
-        .text('◀ Cancel', `admin:report:view:${reportId}`),
-    },
-  );
+  await ctx.editMessageText(ADMIN_REPORT_REJECT_ASK(reportId), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(KB.SKIP_NO_COMMENT, `admin:report:reject:${reportId}`)
+      .row()
+      .text(KB.CANCEL_REJECT, `admin:report:view:${reportId}`),
+  });
 }
 
-// ── Reject — execute (no comment or with comment from session) ──────────────
+// ── Reject — execute ────────────────────────────────────────────────────────
 
 export async function handleAdminReportReject(
   ctx: MyContext,
@@ -167,34 +176,27 @@ export async function handleAdminReportReject(
   const result = await rejectReport(reportId, adminUser?.id ?? 0, comment);
 
   if (!result) {
-    await ctx.answerCallbackQuery({ text: '❌ Report not found or already reviewed', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_REPORT_ALREADY_REVIEWED, show_alert: true });
     return;
   }
 
   ctx.session.adminRejectReportId = undefined;
 
   if (ctx.callbackQuery) {
-    await ctx.answerCallbackQuery({ text: '❌ Report rejected' });
-    await ctx.editMessageText(
-      `❌ <b>Report #${reportId} rejected</b>\n` +
-        (comment ? `Reason: ${comment}` : '<i>No reason given.</i>'),
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard()
-          .text('📊 Back to Reports', 'admin:reports')
-          .row()
-          .text('◀ Admin Menu', 'admin:menu'),
-      },
-    );
+    await ctx.answerCallbackQuery({ text: ADMIN_REPORT_REJECTED_LABEL });
+    await ctx.editMessageText(ADMIN_REPORT_REJECTED_TEXT(reportId, comment), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
+        .row()
+        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
+    });
   }
 
   try {
     await ctx.api.sendMessage(
       result.userTelegramId,
-      `❌ <b>Report rejected</b>\n\n` +
-        `Task: <b>${result.taskTitle}</b>\n` +
-        (comment ? `Reason: ${comment}` : '<i>No reason provided.</i>') +
-        `\n\nPlease review the task requirements and resubmit if needed.`,
+      ADMIN_REPORT_REJECTED_NOTIFY(result.taskTitle, comment),
       { parse_mode: 'HTML' },
     );
   } catch {
@@ -202,7 +204,7 @@ export async function handleAdminReportReject(
   }
 }
 
-// ── Handle reject comment text (called from text router in bot/index.ts) ────
+// ── Handle reject comment text ──────────────────────────────────────────────
 
 export async function handleAdminRejectCommentText(
   ctx: MyContext,
@@ -213,14 +215,11 @@ export async function handleAdminRejectCommentText(
 
   await handleAdminReportReject(ctx, reportId, comment);
 
-  await ctx.reply(
-    `❌ <b>Report #${reportId} rejected</b>\nReason: ${comment}`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('📊 Back to Reports', 'admin:reports')
-        .row()
-        .text('◀ Admin Menu', 'admin:menu'),
-    },
-  );
+  await ctx.reply(ADMIN_REPORT_REJECTED_TEXT(reportId, comment), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
+      .row()
+      .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
+  });
 }

@@ -3,12 +3,12 @@ import { db } from '../../db';
 import { users } from '../../db/schema';
 import { MyContext } from '../context';
 import { mainMenuKeyboard, registrationStep1Keyboard } from '../keyboards';
+import { REG_WELCOME_BACK, REG_PENDING, REG_REJECTED, REG_START } from '../../i18n/ru';
 
 export async function handleStart(ctx: MyContext): Promise<void> {
   const telegramId = ctx.from?.id.toString();
   if (!telegramId) return;
 
-  // Reset any in-progress registration when user sends /start again
   ctx.session.step = 'idle';
   ctx.session.pendingBinanceId = undefined;
 
@@ -16,25 +16,21 @@ export async function handleStart(ctx: MyContext): Promise<void> {
 
   if (user) {
     if (user.status === 'approved') {
-      await ctx.reply(
-        `Welcome back, <b>${ctx.from?.first_name}</b>! 👋\n\nUse the menu below to get started.`,
-        { parse_mode: 'HTML', reply_markup: mainMenuKeyboard() },
-      );
+      await ctx.reply(REG_WELCOME_BACK(ctx.from?.first_name ?? ''), {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuKeyboard(),
+      });
     } else if (user.status === 'pending') {
-      await ctx.reply('⏳ Your registration is pending admin approval. You will be notified once approved.');
+      await ctx.reply(REG_PENDING);
     } else {
-      await ctx.reply('❌ Your registration was rejected. Please contact an admin.');
+      await ctx.reply(REG_REJECTED);
     }
     return;
   }
 
-  // New user — start registration
   ctx.session.step = 'awaiting_binance';
-  await ctx.reply(
-    `👋 <b>Welcome to TaskBot!</b>\n\n` +
-      `To register, we need at least one payment method.\n\n` +
-      `<b>Step 1/2:</b> Enter your <b>Binance Pay ID</b>:\n` +
-      `<i>(9-digit number from your Binance → Pay → Receive screen)</i>`,
-    { parse_mode: 'HTML', reply_markup: registrationStep1Keyboard() },
-  );
+  await ctx.reply(REG_START, {
+    parse_mode: 'HTML',
+    reply_markup: registrationStep1Keyboard(),
+  });
 }

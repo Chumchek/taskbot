@@ -9,9 +9,38 @@ import {
   uploadFile,
 } from '../../../services/storageService';
 import { config } from '../../../config';
+import {
+  KB,
+  MENU,
+  USER_REPORT_ASSIGNMENT_NOT_FOUND,
+  USER_REPORT_WRONG_STATUS,
+  USER_REPORT_START_PROMPT,
+  USER_REPORT_FILE_TOO_LARGE,
+  USER_REPORT_VIDEO_TOO_LARGE,
+  USER_REPORT_MAX_FILES,
+  USER_REPORT_RETRIEVE_FAILED,
+  USER_REPORT_UPLOAD_FAILED,
+  USER_REPORT_PHOTO_RECEIVED,
+  USER_REPORT_VIDEO_RECEIVED,
+  USER_REPORT_SUBMIT_BTN,
+  USER_REPORT_NO_FILES,
+  USER_REPORT_CANCEL_LABEL,
+  USER_REPORT_CANCELLED,
+  USER_REPORT_SUBMITTED,
+  USER_REPORT_ADMIN_NOTIFY,
+  USER_MY_REPORTS_EMPTY,
+  USER_MY_REPORTS_HEADER,
+  USER_REPORT_DETAIL,
+  USER_REPORT_ADMIN_COMMENT,
+  USER_REPORT_APPROVED_HINT,
+  REPORT_STATUS_RU,
+  REPORT_STATUS_EMOJI,
+  TASK_STATUS_RU,
+} from '../../../i18n/ru';
+import { PAYOUT_THRESHOLD } from '../../../services/payoutService';
 
 const MAX_FILES = 10;
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 // ── Start report submission ──────────────────────────────────────────────────
 
@@ -26,16 +55,19 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
   const assignment = assignments.find((a) => a.id === assignmentId);
 
   if (!assignment) {
-    await ctx.editMessageText('❌ Assignment not found.', {
-      reply_markup: new InlineKeyboard().text('◀ Back', 'user:my_tasks'),
+    await ctx.editMessageText(USER_REPORT_ASSIGNMENT_NOT_FOUND, {
+      reply_markup: new InlineKeyboard().text(KB.BACK_MY_TASKS, 'user:my_tasks'),
     });
     return;
   }
 
   if (assignment.status !== 'claimed') {
     await ctx.editMessageText(
-      `❌ This task is already in status: <b>${assignment.status}</b>.\n\nYou can only submit a report for claimed tasks.`,
-      { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('◀ Back', 'user:my_tasks') },
+      USER_REPORT_WRONG_STATUS(TASK_STATUS_RU[assignment.status] ?? assignment.status),
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text(KB.BACK_MY_TASKS, 'user:my_tasks'),
+      },
     );
     return;
   }
@@ -49,19 +81,16 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
   };
 
   const sent = await ctx.editMessageText(
-    `📎 <b>Submit Report — ${assignment.task.title}</b>\n\n` +
-      `Send your proof photos or videos (up to ${MAX_FILES} files, max 20 MB each).\n\n` +
-      `Files received: <b>0</b>`,
+    USER_REPORT_START_PROMPT(assignment.task.title, MAX_FILES, 0),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('✅ Submit Report (0 files)', 'user:report:submit')
+        .text(USER_REPORT_SUBMIT_BTN(0), 'user:report:submit')
         .row()
-        .text('❌ Cancel', 'user:report:cancel'),
+        .text(KB.CANCEL, 'user:report:cancel'),
     },
   );
 
-  // Track the message ID so we can edit the file counter in-place
   if (sent !== true) {
     ctx.session.pendingReport.promptMsgId = sent.message_id;
   }
@@ -75,17 +104,16 @@ export async function handleReportPhoto(ctx: MyContext): Promise<void> {
   const { pendingReport } = ctx.session;
 
   if (pendingReport.files.length >= MAX_FILES) {
-    await ctx.reply(`❌ Maximum ${MAX_FILES} files per report.`);
+    await ctx.reply(USER_REPORT_MAX_FILES(MAX_FILES));
     return;
   }
 
-  // Pick the highest-resolution version of the photo
   const photos = ctx.message?.photo;
   if (!photos || photos.length === 0) return;
   const photo = photos[photos.length - 1];
 
   if (photo.file_size && photo.file_size > MAX_FILE_SIZE_BYTES) {
-    await ctx.reply('❌ File too large (max 20 MB). Please compress it and try again.');
+    await ctx.reply(USER_REPORT_FILE_TOO_LARGE);
     return;
   }
 
@@ -100,7 +128,7 @@ export async function handleReportVideo(ctx: MyContext): Promise<void> {
   const { pendingReport } = ctx.session;
 
   if (pendingReport.files.length >= MAX_FILES) {
-    await ctx.reply(`❌ Maximum ${MAX_FILES} files per report.`);
+    await ctx.reply(USER_REPORT_MAX_FILES(MAX_FILES));
     return;
   }
 
@@ -108,7 +136,7 @@ export async function handleReportVideo(ctx: MyContext): Promise<void> {
   if (!video) return;
 
   if (video.file_size && video.file_size > MAX_FILE_SIZE_BYTES) {
-    await ctx.reply('❌ File too large (max 20 MB). Please compress the video and try again.');
+    await ctx.reply(USER_REPORT_VIDEO_TOO_LARGE);
     return;
   }
 
@@ -132,7 +160,7 @@ async function processMediaFile(
   try {
     const fileObj = await ctx.api.getFile(fileId);
     if (!fileObj.file_path) {
-      await ctx.reply('❌ Could not retrieve file from Telegram. Please try again.');
+      await ctx.reply(USER_REPORT_RETRIEVE_FAILED);
       return;
     }
 
@@ -141,39 +169,33 @@ async function processMediaFile(
     const contentType = fileType === 'photo' ? 'image/jpeg' : 'video/mp4';
     const { checksum } = await uploadFile(buffer, storageKey, contentType);
 
-    pendingReport.files.push({
-      telegramFileId: fileId,
-      fileType,
-      fileSize,
-      storageKey,
-      checksum,
-    });
+    pendingReport.files.push({ telegramFileId: fileId, fileType, fileSize, storageKey, checksum });
 
-    // Update the counter on the original prompt message
     const fileCount = pendingReport.files.length;
-    const fileWord = fileCount === 1 ? 'file' : 'files';
 
     if (pendingReport.promptMsgId) {
       await ctx.api.editMessageText(
         ctx.chat!.id,
         pendingReport.promptMsgId,
-        `📎 <b>Submit Report — ${pendingReport.taskTitle}</b>\n\n` +
-          `Send your proof photos or videos (up to ${MAX_FILES} files, max 20 MB each).\n\n` +
-          `Files received: <b>${fileCount}</b>`,
+        USER_REPORT_START_PROMPT(pendingReport.taskTitle, MAX_FILES, fileCount),
         {
           parse_mode: 'HTML',
           reply_markup: new InlineKeyboard()
-            .text(`✅ Submit Report (${fileCount} ${fileWord})`, 'user:report:submit')
+            .text(USER_REPORT_SUBMIT_BTN(fileCount), 'user:report:submit')
             .row()
-            .text('❌ Cancel', 'user:report:cancel'),
+            .text(KB.CANCEL, 'user:report:cancel'),
         },
       );
     }
 
-    await ctx.reply(`✅ ${fileType === 'photo' ? 'Photo' : 'Video'} received (${fileCount}/${MAX_FILES}).`);
+    const received =
+      fileType === 'photo'
+        ? USER_REPORT_PHOTO_RECEIVED(fileCount, MAX_FILES)
+        : USER_REPORT_VIDEO_RECEIVED(fileCount, MAX_FILES);
+    await ctx.reply(received);
   } catch (err) {
     console.error('Media upload error:', err);
-    await ctx.reply('❌ Upload failed. Please try again.');
+    await ctx.reply(USER_REPORT_UPLOAD_FAILED);
   }
 }
 
@@ -185,10 +207,7 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
   const { pendingReport } = ctx.session;
 
   if (!pendingReport || pendingReport.files.length === 0) {
-    await ctx.answerCallbackQuery({
-      text: '❌ Please send at least one photo or video first.',
-      show_alert: true,
-    });
+    await ctx.answerCallbackQuery({ text: USER_REPORT_NO_FILES, show_alert: true });
     return;
   }
 
@@ -205,20 +224,17 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
     });
   }
 
-  // Notify admins
   for (const adminId of config.admins) {
     try {
-      const fileWord = pendingReport.files.length === 1 ? 'file' : 'files';
+      const userName = ctx.from?.username
+        ? `@${ctx.from.username}`
+        : ctx.from?.first_name ?? '';
       await ctx.api.sendMessage(
         adminId,
-        `📊 <b>New Report #${report.id}</b>\n\n` +
-          `Task: <b>${pendingReport.taskTitle}</b>\n` +
-          `User: ${ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name}\n` +
-          `Files: ${pendingReport.files.length} ${fileWord}`,
+        USER_REPORT_ADMIN_NOTIFY(report.id, pendingReport.taskTitle, userName, pendingReport.files.length),
         {
           parse_mode: 'HTML',
-          reply_markup: new InlineKeyboard()
-            .text('👁 Review', `admin:report:view:${report.id}`),
+          reply_markup: new InlineKeyboard().text('👁 Проверить', `admin:report:view:${report.id}`),
         },
       );
     } catch {
@@ -226,43 +242,31 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
     }
   }
 
-  // Clear report session state
   ctx.session.reportStep = undefined;
   ctx.session.pendingReport = undefined;
 
-  await ctx.editMessageText(
-    `✅ <b>Report submitted!</b>\n\n` +
-      `Your report for <b>${pendingReport.taskTitle}</b> is now under review.\n` +
-      `You'll be notified once an admin approves or rejects it.`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('🎯 My Tasks', 'user:my_tasks')
-        .row()
-        .text('📋 Browse Tasks', 'user:tasks'),
-    },
-  );
+  await ctx.editMessageText(USER_REPORT_SUBMITTED(pendingReport.taskTitle), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(MENU.MY_TASKS, 'user:my_tasks')
+      .row()
+      .text(KB.BROWSE_TASKS, 'user:tasks'),
+  });
 }
 
 // ── Cancel report ────────────────────────────────────────────────────────────
 
 export async function handleReportCancel(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery({ text: 'Cancelled' });
+  await ctx.answerCallbackQuery({ text: USER_REPORT_CANCEL_LABEL });
   ctx.session.reportStep = undefined;
   ctx.session.pendingReport = undefined;
 
-  await ctx.editMessageText('❌ Report submission cancelled.', {
-    reply_markup: new InlineKeyboard().text('◀ My Tasks', 'user:my_tasks'),
+  await ctx.editMessageText(USER_REPORT_CANCELLED, {
+    reply_markup: new InlineKeyboard().text(KB.BACK_MY_TASKS, 'user:my_tasks'),
   });
 }
 
 // ── My reports list ──────────────────────────────────────────────────────────
-
-const STATUS_EMOJI: Record<string, string> = {
-  pending: '⏳',
-  approved: '✅',
-  rejected: '❌',
-};
 
 export async function handleUserReports(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
@@ -274,32 +278,33 @@ export async function handleUserReports(ctx: MyContext): Promise<void> {
   const userReports = await getUserReports(dbUser.id);
 
   if (userReports.length === 0) {
-    await ctx.editMessageText(
-      `📊 <b>My Reports</b>\n\nYou haven't submitted any reports yet.`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard()
-          .text('🎯 My Tasks', 'user:my_tasks')
-          .row()
-          .text('◀ Back', 'user:menu'),
-      },
-    );
+    await ctx.editMessageText(USER_MY_REPORTS_EMPTY, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text(MENU.MY_TASKS, 'user:my_tasks')
+        .row()
+        .text(KB.BACK, 'user:menu'),
+    });
     return;
   }
 
   const kb = new InlineKeyboard();
   for (const r of userReports) {
-    const emoji = STATUS_EMOJI[r.status] ?? '•';
+    const emoji = REPORT_STATUS_EMOJI[r.status] ?? '•';
     kb.text(`${emoji} ${r.taskTitle}`, `user:report:detail:${r.reportId}`).row();
   }
-  kb.text('◀ Back', 'user:menu');
+  kb.text(KB.BACK, 'user:menu');
 
   const lines = userReports
-    .map((r) => `${STATUS_EMOJI[r.status] ?? '•'} <b>${r.taskTitle}</b> — ${r.status}`)
+    .map((r) => {
+      const emoji = REPORT_STATUS_EMOJI[r.status] ?? '•';
+      const statusRu = REPORT_STATUS_RU[r.status] ?? r.status;
+      return `${emoji} <b>${r.taskTitle}</b> — ${statusRu}`;
+    })
     .join('\n');
 
   await ctx.editMessageText(
-    `📊 <b>My Reports</b> (${userReports.length})\n\n${lines}`,
+    `${USER_MY_REPORTS_HEADER(userReports.length)}\n\n${lines}`,
     { parse_mode: 'HTML', reply_markup: kb },
   );
 }
@@ -317,29 +322,26 @@ export async function handleUserReportDetail(ctx: MyContext, reportId: number): 
   const report = userReports.find((r) => r.reportId === reportId);
 
   if (!report) {
-    await ctx.answerCallbackQuery({ text: '❌ Report not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: '❌ Отчёт не найден', show_alert: true });
     return;
   }
 
-  const emoji = STATUS_EMOJI[report.status] ?? '•';
-  const submittedDate = report.submittedAt.toLocaleDateString('uk-UA');
+  const emoji = REPORT_STATUS_EMOJI[report.status] ?? '•';
+  const statusRu = REPORT_STATUS_RU[report.status] ?? report.status;
+  const submittedDate = report.submittedAt.toLocaleDateString('ru-RU');
 
-  let text =
-    `${emoji} <b>Report — ${report.taskTitle}</b>\n\n` +
-    `Status: <b>${report.status}</b>\n` +
-    `Submitted: ${submittedDate}\n` +
-    `Reward: <b>${report.priceUah} UAH</b>`;
+  let text = USER_REPORT_DETAIL(emoji, report.taskTitle, statusRu, submittedDate, report.priceUah);
 
   if (report.status === 'rejected' && report.adminComment) {
-    text += `\n\n💬 <b>Admin comment:</b>\n${report.adminComment}`;
+    text += USER_REPORT_ADMIN_COMMENT(report.adminComment);
   }
 
   if (report.status === 'approved') {
-    text += `\n\n✅ <i>Payment will be processed once your balance reaches 200 UAH.</i>`;
+    text += USER_REPORT_APPROVED_HINT(PAYOUT_THRESHOLD);
   }
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
-    reply_markup: new InlineKeyboard().text('◀ Back to Reports', 'user:reports'),
+    reply_markup: new InlineKeyboard().text(KB.BACK_REPORTS, 'user:reports'),
   });
 }

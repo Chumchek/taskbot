@@ -1,8 +1,9 @@
 import { MyContext } from '../../context';
 import { adminMenuKeyboard } from '../../keyboards';
+import { ADMIN_PANEL_HEADER } from '../../../i18n/ru';
 
 export async function handleAdminCommand(ctx: MyContext): Promise<void> {
-  await ctx.reply('<b>🔧 Admin Panel</b>\n\nWhat would you like to manage?', {
+  await ctx.reply(ADMIN_PANEL_HEADER, {
     parse_mode: 'HTML',
     reply_markup: adminMenuKeyboard(),
   });
@@ -10,7 +11,7 @@ export async function handleAdminCommand(ctx: MyContext): Promise<void> {
 
 export async function handleAdminMenu(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText('<b>🔧 Admin Panel</b>\n\nWhat would you like to manage?', {
+  await ctx.editMessageText(ADMIN_PANEL_HEADER, {
     parse_mode: 'HTML',
     reply_markup: adminMenuKeyboard(),
   });

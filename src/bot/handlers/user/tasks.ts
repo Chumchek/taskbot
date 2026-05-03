@@ -11,6 +11,26 @@ import {
 import { getUserByTelegramId } from '../../../services/userService';
 import { getTaskMedia } from '../../../services/taskMediaService';
 import { getPresignedUrl } from '../../../services/storageService';
+import {
+  deadlineLabel,
+  KB,
+  MENU,
+  USER_NO_TASKS,
+  USER_TASKS_HEADER,
+  USER_TASKS_FOOTER,
+  USER_TASK_UNAVAILABLE,
+  USER_TASK_DETAIL,
+  USER_TASK_ALREADY_CLAIMED,
+  USER_TASK_NO_SLOTS,
+  USER_TASK_CLAIMED_LABEL,
+  USER_TASK_CLAIMED_TEXT,
+  USER_MY_TASKS_EMPTY,
+  USER_MY_TASKS_HEADER,
+  USER_ASSIGNMENT_DETAIL,
+  TASK_STATUS_RU,
+  TASK_STATUS_EMOJI,
+  USER_TASK_HELP_NO_FILES,
+} from '../../../i18n/ru';
 
 // ── Available tasks list ────────────────────────────────────────────────────
 
@@ -27,8 +47,8 @@ export async function handleUserTaskList(ctx: MyContext): Promise<void> {
   ]);
 
   if (activeTasks.length === 0) {
-    await ctx.editMessageText('📋 No tasks available right now. Check back later!', {
-      reply_markup: new InlineKeyboard().text('◀ Back', 'user:menu'),
+    await ctx.editMessageText(USER_NO_TASKS, {
+      reply_markup: new InlineKeyboard().text(KB.BACK, 'user:menu'),
     });
     return;
   }
@@ -36,12 +56,12 @@ export async function handleUserTaskList(ctx: MyContext): Promise<void> {
   const lines = activeTasks
     .map((t) => {
       const claimed = claimedIds.has(t.id) ? ' ✅' : '';
-      return `• <b>${t.title}</b>${claimed} — ${t.priceUah} UAH (${t.slotsAvailable} slot${t.slotsAvailable === 1 ? '' : 's'})`;
+      return `• <b>${t.title}</b>${claimed} — ${t.priceUah} грн (${t.slotsAvailable} место${t.slotsAvailable === 1 ? '' : 'а'})`;
     })
     .join('\n');
 
   await ctx.editMessageText(
-    `📋 <b>Available Tasks</b> (${activeTasks.length})\n\n${lines}\n\n<i>Select a task for details.</i>`,
+    `${USER_TASKS_HEADER(activeTasks.length)}\n\n${lines}\n\n${USER_TASKS_FOOTER}`,
     {
       parse_mode: 'HTML',
       reply_markup: userTaskListKeyboard(activeTasks, claimedIds),
@@ -64,8 +84,8 @@ export async function handleUserTaskView(ctx: MyContext, taskId: number): Promis
   ]);
 
   if (!task || !task.isActive) {
-    await ctx.editMessageText('❌ This task is no longer available.', {
-      reply_markup: new InlineKeyboard().text('◀ Back to Tasks', 'user:tasks'),
+    await ctx.editMessageText(USER_TASK_UNAVAILABLE, {
+      reply_markup: new InlineKeyboard().text(KB.BACK_TASKS, 'user:tasks'),
     });
     return;
   }
@@ -75,22 +95,18 @@ export async function handleUserTaskView(ctx: MyContext, taskId: number): Promis
     await getTaskMedia(task.id),
   ];
 
-  const deadlineLabel = task.deadlineHours % 24 === 0
-    ? `${task.deadlineHours / 24} day${task.deadlineHours / 24 === 1 ? '' : 's'}`
-    : `${task.deadlineHours} hours`;
-
-  const text =
-    `<b>${task.title}</b>\n\n` +
-    (task.description ? `${task.description}\n\n` : '') +
-    `🔗 <a href="${task.link}">Open Task Link</a>\n` +
-    `💰 Reward: <b>${task.priceUah} UAH</b>\n` +
-    `👥 Available slots: <b>${task.slotsAvailable}</b>\n` +
-    `⏰ Deadline after claiming: <b>${deadlineLabel}</b>` +
-    (alreadyClaimed ? '\n\n✅ <i>You have already claimed this task.</i>' : '');
+  const dl = deadlineLabel(task.deadlineHours);
+  const text = USER_TASK_DETAIL(
+    task.title, task.description, task.link, task.priceUah,
+    task.slotsAvailable, dl, alreadyClaimed,
+  );
 
   const kb = userTaskDetailKeyboard(task.id, alreadyClaimed, task.slotsAvailable > 0);
   if (taskMediaFiles.length > 0) {
-    kb.row().text(`📎 Help Material (${taskMediaFiles.length})`, `user:task:help:${task.id}`);
+    kb.row().text(
+      `📎 Материалы (${taskMediaFiles.length})`,
+      `user:task:help:${task.id}`,
+    );
   }
 
   await ctx.editMessageText(text, {
@@ -107,7 +123,7 @@ export async function handleUserTaskClaim(ctx: MyContext, taskId: number): Promi
   const dbUser = await getUserByTelegramId(telegramId);
 
   if (!dbUser) {
-    await ctx.answerCallbackQuery({ text: '❌ User not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: '❌ Пользователь не найден', show_alert: true });
     return;
   }
 
@@ -116,34 +132,27 @@ export async function handleUserTaskClaim(ctx: MyContext, taskId: number): Promi
   if (!result.success) {
     const message =
       result.reason === 'already_claimed'
-        ? '✅ You already have this task.'
-        : '❌ No slots available anymore.';
+        ? USER_TASK_ALREADY_CLAIMED
+        : USER_TASK_NO_SLOTS;
     await ctx.answerCallbackQuery({ text: message, show_alert: true });
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: '✅ Task claimed!' });
+  await ctx.answerCallbackQuery({ text: USER_TASK_CLAIMED_LABEL });
 
   const task = await getTaskById(taskId);
   const expiresAt = result.assignment.expiresAt;
   const deadline = expiresAt
-    ? new Date(expiresAt).toLocaleString('uk-UA', { timeZone: 'Europe/Kiev' })
-    : 'unknown';
+    ? new Date(expiresAt).toLocaleString('ru-RU', { timeZone: 'Europe/Kiev' })
+    : 'неизвестно';
 
-  await ctx.editMessageText(
-    `✅ <b>Task claimed!</b>\n\n` +
-      `<b>${task?.title}</b>\n\n` +
-      `Complete the task and submit your report before the deadline.\n` +
-      `⏰ Deadline: <b>${deadline}</b>\n\n` +
-      `When done, go to <b>My Tasks</b> to submit your report.`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('🎯 My Tasks', 'user:my_tasks')
-        .row()
-        .text('◀ Back to Task List', 'user:tasks'),
-    },
-  );
+  await ctx.editMessageText(USER_TASK_CLAIMED_TEXT(task?.title, deadline), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(MENU.MY_TASKS, 'user:my_tasks')
+      .row()
+      .text(KB.BACK_TASKS, 'user:tasks'),
+  });
 }
 
 // ── My claimed tasks ────────────────────────────────────────────────────────
@@ -158,40 +167,33 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
   const assignments = await getUserAssignments(dbUser.id);
 
   if (assignments.length === 0) {
-    await ctx.editMessageText(
-      `🎯 <b>My Tasks</b>\n\nYou haven't claimed any tasks yet.`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard()
-          .text('📋 Browse Tasks', 'user:tasks')
-          .row()
-          .text('◀ Back', 'user:menu'),
-      },
-    );
+    await ctx.editMessageText(USER_MY_TASKS_EMPTY, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text(KB.BROWSE_TASKS, 'user:tasks')
+        .row()
+        .text(KB.BACK, 'user:menu'),
+    });
     return;
   }
 
-  const statusEmoji: Record<string, string> = {
-    claimed: '⏳',
-    completed: '✅',
-    expired: '❌',
-  };
-
   const lines = assignments
     .map((a) => {
-      const emoji = statusEmoji[a.status] ?? '•';
-      return `${emoji} <b>${a.task.title}</b> — ${a.task.priceUah} UAH [${a.status}]`;
+      const emoji = TASK_STATUS_EMOJI[a.status] ?? '•';
+      const statusRu = TASK_STATUS_RU[a.status] ?? a.status;
+      return `${emoji} <b>${a.task.title}</b> — ${a.task.priceUah} грн [${statusRu}]`;
     })
     .join('\n');
 
   const kb = new InlineKeyboard();
   for (const a of assignments) {
-    kb.text(`${statusEmoji[a.status] ?? '•'} ${a.task.title}`, `user:assignment:view:${a.id}`).row();
+    const emoji = TASK_STATUS_EMOJI[a.status] ?? '•';
+    kb.text(`${emoji} ${a.task.title}`, `user:assignment:view:${a.id}`).row();
   }
-  kb.text('📋 Browse More Tasks', 'user:tasks').row().text('◀ Back', 'user:menu');
+  kb.text(KB.BROWSE_TASKS, 'user:tasks').row().text(KB.BACK, 'user:menu');
 
   await ctx.editMessageText(
-    `🎯 <b>My Tasks</b> (${assignments.length})\n\n${lines}`,
+    `${USER_MY_TASKS_HEADER(assignments.length)}\n\n${lines}`,
     { parse_mode: 'HTML', reply_markup: kb },
   );
 }
@@ -212,34 +214,32 @@ export async function handleUserAssignmentView(
   const assignment = userAssignments.find((a) => a.id === assignmentId);
 
   if (!assignment) {
-    await ctx.answerCallbackQuery({ text: '❌ Assignment not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: '❌ Задание не найдено', show_alert: true });
     return;
   }
 
   const task = assignment.task;
-  const statusEmoji: Record<string, string> = { claimed: '⏳', completed: '✅', expired: '❌' };
   const taskMediaFiles = await getTaskMedia(task.id);
 
   const deadline = assignment.expiresAt
-    ? assignment.expiresAt.toLocaleString('uk-UA', { timeZone: 'Europe/Kiev' })
+    ? assignment.expiresAt.toLocaleString('ru-RU', { timeZone: 'Europe/Kiev' })
     : '—';
 
-  const text =
-    `<b>${task.title}</b>\n\n` +
-    (task.description ? `📝 ${task.description}\n\n` : '') +
-    `🔗 <a href="${task.link}">Open Task Link</a>\n` +
-    `💰 Reward: <b>${task.priceUah} UAH</b>\n` +
-    `⏰ Deadline: <b>${deadline}</b>\n` +
-    `Status: ${statusEmoji[assignment.status] ?? '•'} <b>${assignment.status}</b>`;
+  const statusEmoji = TASK_STATUS_EMOJI[assignment.status] ?? '•';
+  const statusRu = TASK_STATUS_RU[assignment.status] ?? assignment.status;
+
+  const text = USER_ASSIGNMENT_DETAIL(
+    task.title, task.description, task.link, task.priceUah, deadline, statusEmoji, statusRu,
+  );
 
   const kb = new InlineKeyboard();
   if (assignment.status === 'claimed') {
-    kb.text('📝 Submit Report', `user:report:start:${assignmentId}`).row();
+    kb.text(KB.SUBMIT_REPORT, `user:report:start:${assignmentId}`).row();
   }
   if (taskMediaFiles.length > 0) {
-    kb.text(`📎 Help Material (${taskMediaFiles.length})`, `user:task:help:${task.id}`).row();
+    kb.text(`📎 Материалы (${taskMediaFiles.length})`, `user:task:help:${task.id}`).row();
   }
-  kb.text('◀ Back to My Tasks', 'user:my_tasks');
+  kb.text(KB.BACK_MY_TASKS, 'user:my_tasks');
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
@@ -255,7 +255,7 @@ export async function handleUserTaskHelp(ctx: MyContext, taskId: number): Promis
   const files = await getTaskMedia(taskId);
 
   if (files.length === 0) {
-    await ctx.answerCallbackQuery({ text: 'No help material available', show_alert: true });
+    await ctx.answerCallbackQuery({ text: USER_TASK_HELP_NO_FILES, show_alert: true });
     return;
   }
 
@@ -266,11 +266,11 @@ export async function handleUserTaskHelp(ctx: MyContext, taskId: number): Promis
         else await ctx.replyWithVideo(f.telegramFileId);
       } else {
         const url = await getPresignedUrl(f.storageKey, 3600);
-        await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     } catch {
       const url = await getPresignedUrl(f.storageKey, 3600);
-      await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+      await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
     }
   }
 }
@@ -279,8 +279,5 @@ export async function handleUserTaskHelp(ctx: MyContext, taskId: number): Promis
 
 export async function handleUserMenu(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText(
-    `What would you like to do?`,
-    { reply_markup: mainMenuKeyboard() },
-  );
+  await ctx.editMessageText(MENU.MAIN_PROMPT, { reply_markup: mainMenuKeyboard() });
 }

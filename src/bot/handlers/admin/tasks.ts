@@ -11,6 +11,39 @@ import {
 import { getUserByTelegramId } from '../../../services/userService';
 import { getTaskMedia } from '../../../services/taskMediaService';
 import { isValidUrl, isValidPrice, isValidSlots, isValidDeadlineHours } from '../../../utils/validators';
+import {
+  deadlineLabel,
+  KB,
+  ADMIN_NO_TASKS,
+  ADMIN_TASKS_HEADER,
+  ADMIN_TASK_NOT_FOUND,
+  ADMIN_TASK_DETAIL,
+  ADMIN_TASK_ACTIVE_STATUS,
+  ADMIN_TASK_INACTIVE_STATUS,
+  ADMIN_TASK_ACTIVATED,
+  ADMIN_TASK_DEACTIVATED,
+  ADMIN_TASK_DELETE_CONFIRM,
+  ADMIN_TASK_DELETED,
+  ADMIN_TASK_HAS_ACTIVE_ASSIGNMENTS,
+  ADMIN_TASK_CREATE_STEP1,
+  ADMIN_TASK_CREATE_STEP3,
+  ADMIN_TASK_TITLE_SAVED,
+  ADMIN_TASK_DESC_SAVED,
+  ADMIN_TASK_LINK_SAVED,
+  ADMIN_TASK_PRICE_SAVED,
+  ADMIN_TASK_SLOTS_SAVED,
+  ADMIN_TASK_TITLE_TOO_LONG,
+  ADMIN_TASK_DESC_TOO_LONG,
+  ADMIN_TASK_INVALID_URL,
+  ADMIN_TASK_INVALID_PRICE,
+  ADMIN_TASK_INVALID_SLOTS,
+  ADMIN_TASK_INVALID_DEADLINE,
+  ADMIN_TASK_INCOMPLETE,
+  ADMIN_TASK_SUMMARY,
+  ADMIN_TASK_CREATED,
+  ADMIN_PANEL_HEADER,
+  ADMIN_TASK_CREATION_CANCELLED,
+} from '../../../i18n/ru';
 
 // ── Admin task list ─────────────────────────────────────────────────────────
 
@@ -19,19 +52,19 @@ export async function handleAdminTaskList(ctx: MyContext): Promise<void> {
   const allTasks = await getAllTasks();
 
   if (allTasks.length === 0) {
-    await ctx.editMessageText('📋 No tasks yet.', {
+    await ctx.editMessageText(ADMIN_NO_TASKS, {
       reply_markup: new InlineKeyboard()
-        .text('➕ Create Task', 'admin:task:create')
+        .text(KB.CREATE_TASK, 'admin:task:create')
         .row()
-        .text('◀ Back', 'admin:menu'),
+        .text(KB.BACK, 'admin:menu'),
     });
     return;
   }
 
-  await ctx.editMessageText(
-    `📋 <b>All Tasks</b> (${allTasks.length})`,
-    { parse_mode: 'HTML', reply_markup: adminTaskListKeyboard(allTasks) },
-  );
+  await ctx.editMessageText(ADMIN_TASKS_HEADER(allTasks.length), {
+    parse_mode: 'HTML',
+    reply_markup: adminTaskListKeyboard(allTasks),
+  });
 }
 
 // ── Task detail (admin view) ────────────────────────────────────────────────
@@ -44,21 +77,16 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
   ]);
 
   if (!task) {
-    await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_TASK_NOT_FOUND, show_alert: true });
     return;
   }
 
-  const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
-  const deadlineLabel = task.deadlineHours % 24 === 0
-    ? `${task.deadlineHours / 24}d` : `${task.deadlineHours}h`;
-  const text =
-    `<b>${task.title}</b>\n\n` +
-    (task.description ? `📝 ${task.description}\n\n` : '') +
-    `🔗 <a href="${task.link}">Task Link</a>\n` +
-    `💰 Price: <b>${task.priceUah} UAH</b>\n` +
-    `👥 Slots: ${task.slotsAvailable}/${task.slotsTotal}\n` +
-    `⏰ Deadline: <b>${deadlineLabel}</b>\n` +
-    `Status: ${status}`;
+  const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
+  const dl = deadlineLabel(task.deadlineHours);
+  const text = ADMIN_TASK_DETAIL(
+    task.title, task.description, task.link, task.priceUah,
+    task.slotsAvailable, task.slotsTotal, dl, status,
+  );
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
@@ -73,27 +101,21 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
   const task = await toggleTaskActive(taskId);
 
   if (!task) {
-    await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_TASK_NOT_FOUND, show_alert: true });
     return;
   }
 
   await ctx.answerCallbackQuery({
-    text: task.isActive ? '🟢 Task activated' : '🔴 Task deactivated',
+    text: task.isActive ? ADMIN_TASK_ACTIVATED : ADMIN_TASK_DEACTIVATED,
   });
 
-  // Refresh the detail view in-place
-  const [taskMediaFiles] = await Promise.all([getTaskMedia(task.id)]);
-  const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
-  const deadlineLabel = task.deadlineHours % 24 === 0
-    ? `${task.deadlineHours / 24}d` : `${task.deadlineHours}h`;
-  const text =
-    `<b>${task.title}</b>\n\n` +
-    (task.description ? `📝 ${task.description}\n\n` : '') +
-    `🔗 <a href="${task.link}">Task Link</a>\n` +
-    `💰 Price: <b>${task.priceUah} UAH</b>\n` +
-    `👥 Slots: ${task.slotsAvailable}/${task.slotsTotal}\n` +
-    `⏰ Deadline: <b>${deadlineLabel}</b>\n` +
-    `Status: ${status}`;
+  const taskMediaFiles = await getTaskMedia(task.id);
+  const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
+  const dl = deadlineLabel(task.deadlineHours);
+  const text = ADMIN_TASK_DETAIL(
+    task.title, task.description, task.link, task.priceUah,
+    task.slotsAvailable, task.slotsTotal, dl, status,
+  );
 
   await ctx.editMessageText(text, {
     parse_mode: 'HTML',
@@ -109,19 +131,16 @@ export async function handleAdminTaskDeleteConfirm(ctx: MyContext, taskId: numbe
   const task = await getTaskById(taskId);
 
   if (!task) {
-    await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_TASK_NOT_FOUND, show_alert: true });
     return;
   }
 
-  await ctx.editMessageText(
-    `🗑 <b>Delete task?</b>\n\n"${task.title}"\n\nThis cannot be undone.`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('✅ Yes, Delete', `admin:task:delete:${taskId}`)
-        .text('❌ Cancel', `admin:task:view:${taskId}`),
-    },
-  );
+  await ctx.editMessageText(ADMIN_TASK_DELETE_CONFIRM(task.title), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(KB.YES_DELETE, `admin:task:delete:${taskId}`)
+      .text(KB.CANCEL, `admin:task:view:${taskId}`),
+  });
 }
 
 export async function handleAdminTaskDelete(ctx: MyContext, taskId: number): Promise<void> {
@@ -130,29 +149,29 @@ export async function handleAdminTaskDelete(ctx: MyContext, taskId: number): Pro
   if (!result.success) {
     if (result.reason === 'has_active_assignments') {
       await ctx.answerCallbackQuery({
-        text: `❌ ${result.count} user(s) are actively working on this task. Deactivate it and wait for them to finish or expire (up to 24h).`,
+        text: ADMIN_TASK_HAS_ACTIVE_ASSIGNMENTS(result.count ?? 0),
         show_alert: true,
       });
     } else {
-      await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+      await ctx.answerCallbackQuery({ text: ADMIN_TASK_NOT_FOUND, show_alert: true });
     }
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: '🗑 Task deleted' });
+  await ctx.answerCallbackQuery({ text: ADMIN_TASK_DELETED });
   const allTasks = await getAllTasks();
 
   await ctx.editMessageText(
-    allTasks.length > 0 ? `📋 <b>All Tasks</b> (${allTasks.length})` : '📋 No tasks yet.',
+    allTasks.length > 0 ? ADMIN_TASKS_HEADER(allTasks.length) : ADMIN_NO_TASKS,
     {
       parse_mode: 'HTML',
       reply_markup:
         allTasks.length > 0
           ? adminTaskListKeyboard(allTasks)
           : new InlineKeyboard()
-              .text('➕ Create Task', 'admin:task:create')
+              .text(KB.CREATE_TASK, 'admin:task:create')
               .row()
-              .text('◀ Back', 'admin:menu'),
+              .text(KB.BACK, 'admin:menu'),
     },
   );
 }
@@ -164,13 +183,10 @@ export async function handleAdminTaskCreate(ctx: MyContext): Promise<void> {
   ctx.session.taskStep = 'awaiting_title';
   ctx.session.pendingTask = {};
 
-  await ctx.editMessageText(
-    `➕ <b>New Task — Step 1/6</b>\n\nEnter the task <b>title</b>:\n<i>(max 100 characters)</i>`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-    },
-  );
+  await ctx.editMessageText(ADMIN_TASK_CREATE_STEP1, {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+  });
 }
 
 export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
@@ -181,128 +197,103 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
 
   if (taskStep === 'awaiting_title') {
     if (text.length > 100) {
-      await ctx.reply('❌ Title too long (max 100 chars). Try again:');
+      await ctx.reply(ADMIN_TASK_TITLE_TOO_LONG);
       return;
     }
     ctx.session.pendingTask = { ...pendingTask, title: text };
     ctx.session.taskStep = 'awaiting_description';
 
-    await ctx.reply(
-      `✅ Title: <b>${text}</b>\n\n<b>Step 2/6:</b> Enter a description:\n<i>(optional, max 500 chars)</i>`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard()
-          .text('Skip ▶', 'admin:task:skip_desc')
-          .text('❌ Cancel', 'admin:task:cancel_create'),
-      },
-    );
+    await ctx.reply(ADMIN_TASK_TITLE_SAVED(text), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text('Пропустить ▶', 'admin:task:skip_desc')
+        .text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
     return;
   }
 
   if (taskStep === 'awaiting_description') {
     if (text.length > 500) {
-      await ctx.reply('❌ Description too long (max 500 chars). Try again:');
+      await ctx.reply(ADMIN_TASK_DESC_TOO_LONG);
       return;
     }
     ctx.session.pendingTask = { ...pendingTask, description: text };
     ctx.session.taskStep = 'awaiting_link';
 
-    await ctx.reply(
-      `✅ Description saved.\n\n<b>Step 3/6:</b> Enter the task <b>link</b> (URL):`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-      },
-    );
+    await ctx.reply(ADMIN_TASK_DESC_SAVED, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
     return;
   }
 
   if (taskStep === 'awaiting_link') {
     if (!isValidUrl(text)) {
-      await ctx.reply('❌ Invalid URL. Must start with http:// or https://. Try again:');
+      await ctx.reply(ADMIN_TASK_INVALID_URL);
       return;
     }
     ctx.session.pendingTask = { ...pendingTask, link: text };
     ctx.session.taskStep = 'awaiting_price';
 
-    await ctx.reply(
-      `✅ Link saved.\n\n<b>Step 4/6:</b> Enter the <b>payment amount</b> in UAH:\n<i>(e.g. 50 or 75.50)</i>`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-      },
-    );
+    await ctx.reply(ADMIN_TASK_LINK_SAVED, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
     return;
   }
 
   if (taskStep === 'awaiting_price') {
     if (!isValidPrice(text)) {
-      await ctx.reply('❌ Invalid price. Enter a positive number (e.g. 50 or 75.50):');
+      await ctx.reply(ADMIN_TASK_INVALID_PRICE);
       return;
     }
     ctx.session.pendingTask = { ...pendingTask, priceUah: text };
     ctx.session.taskStep = 'awaiting_slots';
 
-    await ctx.reply(
-      `✅ Price: <b>${text} UAH</b>\n\n<b>Step 5/6:</b> Enter the number of <b>available slots</b>:\n<i>(how many users can claim this task)</i>`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-      },
-    );
+    await ctx.reply(ADMIN_TASK_PRICE_SAVED(text), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
     return;
   }
 
   if (taskStep === 'awaiting_slots') {
     if (!isValidSlots(text)) {
-      await ctx.reply('❌ Invalid number. Enter a positive integer (max 1000):');
+      await ctx.reply(ADMIN_TASK_INVALID_SLOTS);
       return;
     }
 
     ctx.session.pendingTask = { ...pendingTask, slotsTotal: parseInt(text, 10) };
     ctx.session.taskStep = 'awaiting_deadline';
 
-    await ctx.reply(
-      `✅ Slots: <b>${text}</b>\n\n<b>Step 6/6:</b> Enter the <b>deadline</b> in hours:\n<i>(how long users have to complete the task after claiming, e.g. 24, 48, 72)</i>`,
-      {
-        parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-      },
-    );
+    await ctx.reply(ADMIN_TASK_SLOTS_SAVED(text), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
     return;
   }
 
   if (taskStep === 'awaiting_deadline') {
     if (!isValidDeadlineHours(text)) {
-      await ctx.reply('❌ Invalid value. Enter a number of hours between 1 and 720:');
+      await ctx.reply(ADMIN_TASK_INVALID_DEADLINE);
       return;
     }
 
-    const deadlineHours = parseInt(text, 10);
-    const task = { ...pendingTask, deadlineHours };
+    const hours = parseInt(text, 10);
+    const task = { ...pendingTask, deadlineHours: hours };
     ctx.session.pendingTask = task;
     ctx.session.taskStep = 'confirming';
 
-    const deadlineLabel =
-      deadlineHours % 24 === 0
-        ? `${deadlineHours / 24} day${deadlineHours / 24 === 1 ? '' : 's'}`
-        : `${deadlineHours} hours`;
-
-    const summary =
-      `📋 <b>Task Summary</b>\n\n` +
-      `Title: <b>${task.title}</b>\n` +
-      (task.description ? `Description: ${task.description}\n` : '') +
-      `Link: <a href="${task.link}">${task.link}</a>\n` +
-      `Price: <b>${task.priceUah} UAH</b>\n` +
-      `Slots: <b>${task.slotsTotal}</b>\n` +
-      `Deadline: <b>${deadlineLabel}</b>\n\n` +
-      `Create this task?`;
+    const dl = deadlineLabel(hours);
+    const summary = ADMIN_TASK_SUMMARY(
+      task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!, dl,
+    );
 
     await ctx.reply(summary, {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('✅ Create Task', 'admin:task:confirm_create')
-        .text('❌ Cancel', 'admin:task:cancel_create'),
+        .text('✅ Создать задание', 'admin:task:confirm_create')
+        .text(KB.CANCEL, 'admin:task:cancel_create'),
       link_preview_options: { is_disabled: true },
     });
   }
@@ -312,13 +303,10 @@ export async function handleAdminTaskSkipDesc(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
   ctx.session.taskStep = 'awaiting_link';
 
-  await ctx.editMessageText(
-    `<b>Step 3/6:</b> Enter the task <b>link</b> (URL):`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
-    },
-  );
+  await ctx.editMessageText(ADMIN_TASK_CREATE_STEP3, {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+  });
 }
 
 export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void> {
@@ -332,7 +320,7 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
     !pendingTask.slotsTotal ||
     !pendingTask.deadlineHours
   ) {
-    await ctx.editMessageText('❌ Incomplete task data. Please start over.', {
+    await ctx.editMessageText(ADMIN_TASK_INCOMPLETE, {
       reply_markup: adminMenuKeyboard(),
     });
     ctx.session.taskStep = undefined;
@@ -355,26 +343,22 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
   ctx.session.taskStep = undefined;
   ctx.session.pendingTask = undefined;
 
-  await ctx.editMessageText(
-    `✅ <b>Task created!</b>\n\n<b>${task.title}</b>\n💰 ${task.priceUah} UAH | 👥 ${task.slotsTotal} slots`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('📋 View All Tasks', 'admin:tasks')
-        .row()
-        .text('◀ Admin Menu', 'admin:menu'),
-    },
-  );
+  await ctx.editMessageText(ADMIN_TASK_CREATED(task.title, task.priceUah, task.slotsTotal), {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(KB.VIEW_ALL_TASKS, 'admin:tasks')
+      .row()
+      .text(KB.BACK_ADMIN, 'admin:menu'),
+  });
 }
 
 export async function handleAdminTaskCancelCreate(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery({ text: 'Cancelled' });
+  await ctx.answerCallbackQuery({ text: 'Отменено' });
   ctx.session.taskStep = undefined;
   ctx.session.pendingTask = undefined;
 
-  await ctx.editMessageText('<b>🔧 Admin Panel</b>\n\nTask creation cancelled.', {
+  await ctx.editMessageText(ADMIN_TASK_CREATION_CANCELLED, {
     parse_mode: 'HTML',
     reply_markup: adminMenuKeyboard(),
   });
 }
-

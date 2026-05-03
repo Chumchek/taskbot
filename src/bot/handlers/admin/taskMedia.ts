@@ -12,6 +12,21 @@ import {
   uploadFile,
   getPresignedUrl,
 } from '../../../services/storageService';
+import {
+  KB,
+  ADMIN_TASK_NOT_FOUND,
+  ADMIN_TASK_MEDIA_HEADER,
+  ADMIN_TASK_MEDIA_UPLOAD_PROMPT,
+  ADMIN_TASK_MEDIA_ADDED,
+  ADMIN_TASK_MEDIA_MAX_FILES,
+  ADMIN_TASK_MEDIA_TOO_LARGE,
+  ADMIN_TASK_MEDIA_UPLOAD_FAILED,
+  ADMIN_TASK_MEDIA_SAVED,
+  ADMIN_TASK_MEDIA_NO_FILES_PREVIEW,
+  ADMIN_TASK_MEDIA_CLEAR_CONFIRM,
+  ADMIN_TASK_MEDIA_CLEARED,
+  ADMIN_TASK_MEDIA_DONE_BTN,
+} from '../../../i18n/ru';
 
 const MAX_TASK_MEDIA = 10;
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
@@ -23,28 +38,25 @@ export async function handleAdminTaskMedia(ctx: MyContext, taskId: number): Prom
 
   const [task, files] = await Promise.all([getTaskById(taskId), getTaskMedia(taskId)]);
   if (!task) {
-    await ctx.answerCallbackQuery({ text: '❌ Task not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_TASK_NOT_FOUND, show_alert: true });
     return;
   }
 
   const kb = new InlineKeyboard();
   if (files.length < MAX_TASK_MEDIA) {
-    kb.text('➕ Add Media', `admin:task:media:upload:${taskId}`).row();
+    kb.text(KB.ADD_MEDIA, `admin:task:media:upload:${taskId}`).row();
   }
   if (files.length > 0) {
-    kb.text('👁 Preview', `admin:task:media:preview:${taskId}`)
-      .text('🗑 Remove All', `admin:task:media:clear_confirm:${taskId}`)
+    kb.text(KB.PREVIEW, `admin:task:media:preview:${taskId}`)
+      .text(KB.REMOVE_ALL, `admin:task:media:clear_confirm:${taskId}`)
       .row();
   }
-  kb.text('◀ Back to Task', `admin:task:view:${taskId}`);
+  kb.text('◀ К заданию', `admin:task:view:${taskId}`);
 
-  await ctx.editMessageText(
-    `📎 <b>Help Media — ${task.title}</b>\n\n` +
-      (files.length === 0
-        ? `No help media yet. Add photos or videos to help users complete this task.`
-        : `${files.length} file${files.length === 1 ? '' : 's'} attached.`),
-    { parse_mode: 'HTML', reply_markup: kb },
-  );
+  await ctx.editMessageText(ADMIN_TASK_MEDIA_HEADER(task.title, files.length), {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+  });
 }
 
 // ── Start upload session ────────────────────────────────────────────────────
@@ -62,15 +74,13 @@ export async function handleAdminTaskMediaStartUpload(
   ctx.session.pendingTaskMedia = { taskId, taskTitle: task.title, count: 0 };
 
   const sent = await ctx.editMessageText(
-    `📎 <b>Add Help Media — ${task.title}</b>\n\n` +
-      `Send photos or videos (up to ${MAX_TASK_MEDIA} files, max 20 MB each).\n\n` +
-      `Files received: <b>0</b>`,
+    ADMIN_TASK_MEDIA_UPLOAD_PROMPT(task.title, MAX_TASK_MEDIA, 0),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('✅ Done', 'admin:task:media:done')
+        .text(ADMIN_TASK_MEDIA_DONE_BTN(0), 'admin:task:media:done')
         .row()
-        .text('❌ Cancel', `admin:task:media:${taskId}`),
+        .text(KB.CANCEL, `admin:task:media:${taskId}`),
     },
   );
 
@@ -79,7 +89,7 @@ export async function handleAdminTaskMediaStartUpload(
   }
 }
 
-// ── Handle photo upload ─────────────────────────────────────────────────────
+// ── Handle photo/video upload ───────────────────────────────────────────────
 
 export async function handleTaskMediaPhoto(ctx: MyContext): Promise<void> {
   await processTaskMediaFile(ctx, 'photo');
@@ -94,7 +104,7 @@ async function processTaskMediaFile(ctx: MyContext, fileType: 'photo' | 'video')
   if (!pendingTaskMedia) return;
 
   if (pendingTaskMedia.count >= MAX_TASK_MEDIA) {
-    await ctx.reply(`❌ Maximum ${MAX_TASK_MEDIA} files per task.`);
+    await ctx.reply(ADMIN_TASK_MEDIA_MAX_FILES(MAX_TASK_MEDIA));
     return;
   }
 
@@ -106,7 +116,7 @@ async function processTaskMediaFile(ctx: MyContext, fileType: 'photo' | 'video')
   if (!file) return;
 
   if (file.file_size && file.file_size > MAX_FILE_SIZE_BYTES) {
-    await ctx.reply('❌ File too large (max 20 MB).');
+    await ctx.reply(ADMIN_TASK_MEDIA_TOO_LARGE);
     return;
   }
 
@@ -135,29 +145,27 @@ async function processTaskMediaFile(ctx: MyContext, fileType: 'photo' | 'video')
       await ctx.api.editMessageText(
         ctx.chat!.id,
         pendingTaskMedia.promptMsgId,
-        `📎 <b>Add Help Media — ${pendingTaskMedia.taskTitle}</b>\n\n` +
-          `Send photos or videos (up to ${MAX_TASK_MEDIA} files, max 20 MB each).\n\n` +
-          `Files received: <b>${count}</b>`,
+        ADMIN_TASK_MEDIA_UPLOAD_PROMPT(pendingTaskMedia.taskTitle, MAX_TASK_MEDIA, count),
         {
           parse_mode: 'HTML',
           reply_markup: new InlineKeyboard()
-            .text(`✅ Done (${count} file${count === 1 ? '' : 's'})`, 'admin:task:media:done')
+            .text(ADMIN_TASK_MEDIA_DONE_BTN(count), 'admin:task:media:done')
             .row()
-            .text('❌ Cancel', `admin:task:media:${pendingTaskMedia.taskId}`),
+            .text(KB.CANCEL, `admin:task:media:${pendingTaskMedia.taskId}`),
         },
       );
     }
 
-    await ctx.reply(`✅ ${fileType === 'photo' ? 'Photo' : 'Video'} added (${count}/${MAX_TASK_MEDIA}).`);
+    await ctx.reply(ADMIN_TASK_MEDIA_ADDED(fileType, count, MAX_TASK_MEDIA));
   } catch {
-    await ctx.reply('❌ Upload failed. Please try again.');
+    await ctx.reply(ADMIN_TASK_MEDIA_UPLOAD_FAILED);
   }
 }
 
 // ── Done uploading ──────────────────────────────────────────────────────────
 
 export async function handleAdminTaskMediaDone(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery({ text: '✅ Media saved' });
+  await ctx.answerCallbackQuery({ text: ADMIN_TASK_MEDIA_SAVED });
   const taskId = ctx.session.pendingTaskMedia?.taskId;
   ctx.session.taskMediaStep = undefined;
   ctx.session.pendingTaskMedia = undefined;
@@ -174,7 +182,7 @@ export async function handleAdminTaskMediaPreview(ctx: MyContext, taskId: number
   const files = await getTaskMedia(taskId);
 
   if (files.length === 0) {
-    await ctx.answerCallbackQuery({ text: 'No files to preview', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_TASK_MEDIA_NO_FILES_PREVIEW, show_alert: true });
     return;
   }
 
@@ -185,11 +193,11 @@ export async function handleAdminTaskMediaPreview(ctx: MyContext, taskId: number
         else await ctx.replyWithVideo(f.telegramFileId);
       } else {
         const url = await getPresignedUrl(f.storageKey, 600);
-        await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     } catch {
       const url = await getPresignedUrl(f.storageKey, 600);
-      await ctx.reply(`🔗 <a href="${url}">View file</a>`, { parse_mode: 'HTML' });
+      await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
     }
   }
 }
@@ -201,19 +209,16 @@ export async function handleAdminTaskMediaClearConfirm(
   taskId: number,
 ): Promise<void> {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText(
-    `🗑 <b>Remove all help media?</b>\n\nThis cannot be undone.`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('✅ Yes, Remove All', `admin:task:media:clear:${taskId}`)
-        .text('❌ Cancel', `admin:task:media:${taskId}`),
-    },
-  );
+  await ctx.editMessageText(ADMIN_TASK_MEDIA_CLEAR_CONFIRM, {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard()
+      .text(KB.YES_REMOVE_ALL, `admin:task:media:clear:${taskId}`)
+      .text(KB.CANCEL, `admin:task:media:${taskId}`),
+  });
 }
 
 export async function handleAdminTaskMediaClear(ctx: MyContext, taskId: number): Promise<void> {
-  await ctx.answerCallbackQuery({ text: '🗑 Media removed' });
+  await ctx.answerCallbackQuery({ text: ADMIN_TASK_MEDIA_CLEARED });
   await deleteAllTaskMedia(taskId);
   await handleAdminTaskMedia(ctx, taskId);
 }

@@ -7,7 +7,16 @@ import {
   getUserPayoutHistory,
   PAYOUT_THRESHOLD,
 } from '../../../services/payoutService';
-import { mainMenuKeyboard } from '../../keyboards';
+import {
+  KB,
+  USER_BALANCE_HEADER,
+  USER_BALANCE_IN_QUEUE,
+  USER_BALANCE_NEED_MORE,
+  USER_BALANCE_COMPLETED_SINCE_PAYOUT,
+  USER_BALANCE_NO_COMPLETED,
+  USER_BALANCE_PAYMENT_METHOD,
+  USER_BALANCE_TOTAL_PAID,
+} from '../../../i18n/ru';
 
 export async function handleUserBalance(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
@@ -22,55 +31,53 @@ export async function handleUserBalance(ctx: MyContext): Promise<void> {
     getUserPayoutHistory(user.id),
   ]);
 
-  // Build task breakdown
   let taskLines = '';
   if (completedTasks.length > 0) {
     taskLines =
-      '\n\n<b>Completed since last payout:</b>\n' +
+      USER_BALANCE_COMPLETED_SINCE_PAYOUT +
       completedTasks
         .map((t) => {
           const date = t.completedAt
-            ? new Date(t.completedAt).toLocaleDateString('uk-UA')
+            ? new Date(t.completedAt).toLocaleDateString('ru-RU')
             : '';
-          return `• ${t.taskTitle} — <b>${t.priceUah} UAH</b>${date ? ` (${date})` : ''}`;
+          return `• ${t.taskTitle} — <b>${t.priceUah} грн</b>${date ? ` (${date})` : ''}`;
         })
         .join('\n');
   } else {
-    taskLines = '\n\n<i>No completed tasks in current cycle.</i>';
+    taskLines = USER_BALANCE_NO_COMPLETED;
   }
 
-  // Payout status
   const remaining = PAYOUT_THRESHOLD - balance;
   const payoutStatus =
     balance >= PAYOUT_THRESHOLD
-      ? `\n\n✅ <b>You're in the payout queue!</b> An admin will process your payment soon.`
-      : `\n\n⏳ You need <b>${remaining.toFixed(2)} UAH</b> more to reach the payout threshold (${PAYOUT_THRESHOLD} UAH).`;
+      ? USER_BALANCE_IN_QUEUE
+      : USER_BALANCE_NEED_MORE(remaining.toFixed(2), PAYOUT_THRESHOLD);
 
-  // Payment method
   const info = getPaymentInfo(user);
   const paymentLines = [
     info.binanceId ? `• Binance ID: <code>${info.binanceId}</code>` : null,
-    info.maskedCard ? `• Card: <code>${info.maskedCard}</code>` : null,
+    info.maskedCard ? `• Карта: <code>${info.maskedCard}</code>` : null,
   ]
     .filter(Boolean)
     .join('\n');
 
-  // Payout history summary
   const historyLine =
     payoutHistory.length > 0
-      ? `\n\n<b>Total paid out:</b> ${payoutHistory.reduce((sum, p) => sum + parseFloat(p.amount), 0).toFixed(2)} UAH (${payoutHistory.length} payout${payoutHistory.length === 1 ? '' : 's'})`
+      ? USER_BALANCE_TOTAL_PAID(
+          payoutHistory.reduce((sum, p) => sum + parseFloat(p.amount), 0).toFixed(2),
+          payoutHistory.length,
+        )
       : '';
 
   await ctx.editMessageText(
-    `💰 <b>My Balance</b>\n\n` +
-      `Current balance: <b>${balance.toFixed(2)} UAH</b>` +
+    USER_BALANCE_HEADER(balance.toFixed(2)) +
       payoutStatus +
       taskLines +
-      (paymentLines ? `\n\n<b>Payment method on file:</b>\n${paymentLines}` : '') +
+      (paymentLines ? USER_BALANCE_PAYMENT_METHOD + paymentLines : '') +
       historyLine,
     {
       parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard().text('◀ Back', 'user:menu'),
+      reply_markup: new InlineKeyboard().text(KB.BACK, 'user:menu'),
     },
   );
 }

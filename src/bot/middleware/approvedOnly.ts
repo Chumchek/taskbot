@@ -1,6 +1,7 @@
 import { NextFunction } from 'grammy';
 import { MyContext } from '../context';
 import { isAdmin, getUserByTelegramId } from '../../services/userService';
+import { AUTH_NOT_REGISTERED, AUTH_PENDING, AUTH_REJECTED } from '../../i18n/ru';
 
 // Global guard that runs on every update (after session middleware).
 // Blocks unapproved/unregistered users from accessing bot features.
@@ -13,38 +14,32 @@ import { isAdmin, getUserByTelegramId } from '../../services/userService';
 export async function approvedOnly(ctx: MyContext, next: NextFunction): Promise<void> {
   const telegramId = ctx.from?.id.toString();
 
-  // No identifiable sender (channel posts, etc.) — pass through
   if (!telegramId) return next();
 
-  // /start is always allowed so users can see their status or begin registration
   const messageText = ctx.message?.text ?? '';
   if (messageText.startsWith('/start')) return next();
 
-  // Registration inline buttons are always allowed
   const cbData = ctx.callbackQuery?.data ?? '';
   if (cbData.startsWith('reg:')) return next();
 
-  // Users actively in the registration text flow (entering Binance ID / card)
   if (ctx.session.step !== 'idle') return next();
 
-  // Admins bypass the approved check entirely
   if (await isAdmin(telegramId)) return next();
 
-  // Everyone else: look up user status
   const user = await getUserByTelegramId(telegramId);
 
   if (!user) {
-    await replyOrAlert(ctx, '⚠️ Please use /start to register first.');
+    await replyOrAlert(ctx, AUTH_NOT_REGISTERED);
     return;
   }
 
   if (user.status === 'pending') {
-    await replyOrAlert(ctx, '⏳ Your registration is pending admin approval. You will be notified once approved.');
+    await replyOrAlert(ctx, AUTH_PENDING);
     return;
   }
 
   if (user.status === 'rejected') {
-    await replyOrAlert(ctx, '❌ Your registration was rejected. Please contact an admin.');
+    await replyOrAlert(ctx, AUTH_REJECTED);
     return;
   }
 

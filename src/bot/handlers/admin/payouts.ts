@@ -10,6 +10,22 @@ import {
   processUserPayout,
   PAYOUT_THRESHOLD,
 } from '../../../services/payoutService';
+import {
+  KB,
+  ADMIN_PAYOUT_EMPTY,
+  ADMIN_PAYOUT_QUEUE_HEADER,
+  ADMIN_PAYOUT_USER_NOT_FOUND,
+  ADMIN_PAYOUT_NO_LONGER_ELIGIBLE,
+  ADMIN_PAYOUT_DETAIL,
+  ADMIN_PAYOUT_NO_TASK_DETAILS,
+  ADMIN_PAYOUT_CONFIRM,
+  ADMIN_PAYOUT_FAILED,
+  ADMIN_PAYOUT_RECORDED_LABEL,
+  ADMIN_PAYOUT_RECORDED_TEXT,
+  ADMIN_PAYOUT_NOTIFY,
+  ADMIN_PAYOUT_SHOW_CARD,
+  ADMIN_PAYOUT_NO_CARD,
+} from '../../../i18n/ru';
 
 // ── Payout queue list ───────────────────────────────────────────────────────
 
@@ -19,10 +35,10 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
   const queue = await getPayoutQueue();
 
   if (queue.length === 0) {
-    await ctx.editMessageText(
-      `💰 <b>Payout Queue</b>\n\nNo users have reached the ${PAYOUT_THRESHOLD} UAH threshold yet.`,
-      { parse_mode: 'HTML', reply_markup: adminMenuKeyboard() },
-    );
+    await ctx.editMessageText(ADMIN_PAYOUT_EMPTY(PAYOUT_THRESHOLD), {
+      parse_mode: 'HTML',
+      reply_markup: adminMenuKeyboard(),
+    });
     return;
   }
 
@@ -31,15 +47,17 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
     const name = item.user.username
       ? `@${item.user.username}`
       : item.user.firstName ?? item.user.telegramId;
-    kb.text(`👤 ${name} — ${parseFloat(item.balance).toFixed(2)} UAH`, `admin:payout:view:${item.user.id}`).row();
+    kb.text(
+      `👤 ${name} — ${parseFloat(item.balance).toFixed(2)} грн`,
+      `admin:payout:view:${item.user.id}`,
+    ).row();
   }
-  kb.text('◀ Back', 'admin:menu');
+  kb.text(KB.BACK, 'admin:menu');
 
-  await ctx.editMessageText(
-    `💰 <b>Payout Queue</b> (${queue.length} user${queue.length === 1 ? '' : 's'})\n\n` +
-      `These users have reached the ${PAYOUT_THRESHOLD} UAH threshold and are waiting for payment.`,
-    { parse_mode: 'HTML', reply_markup: kb },
-  );
+  await ctx.editMessageText(ADMIN_PAYOUT_QUEUE_HEADER(queue.length, PAYOUT_THRESHOLD), {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+  });
 }
 
 // ── User payout detail ──────────────────────────────────────────────────────
@@ -47,12 +65,11 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
 export async function handleAdminPayoutView(ctx: MyContext, userId: number): Promise<void> {
   await ctx.answerCallbackQuery();
 
-  // Find user by their DB id
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
 
   if (!item) {
-    await ctx.answerCallbackQuery({ text: '❌ User not found or no longer eligible', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_USER_NOT_FOUND, show_alert: true });
     await handleAdminPayoutQueue(ctx);
     return;
   }
@@ -62,47 +79,44 @@ export async function handleAdminPayoutView(ctx: MyContext, userId: number): Pro
   const paymentInfo = getPaymentInfo(user);
   const completedTasks = await getUnpaidCompletedTasks(user.id);
 
-  // Payment methods
   const paymentLines = [
     paymentInfo.binanceId
       ? `• Binance ID: <code>${paymentInfo.binanceId}</code>`
       : null,
     paymentInfo.maskedCard
-      ? `• Card: <code>${paymentInfo.maskedCard}</code>`
+      ? `• Карта: <code>${paymentInfo.maskedCard}</code>`
       : null,
   ]
     .filter(Boolean)
     .join('\n');
 
-  // Task breakdown
   const taskLines =
     completedTasks.length > 0
       ? completedTasks
           .map((t) => {
             const date = t.completedAt
-              ? new Date(t.completedAt).toLocaleDateString('uk-UA')
+              ? new Date(t.completedAt).toLocaleDateString('ru-RU')
               : '';
-            return `• ${t.taskTitle} — ${t.priceUah} UAH${date ? ` (${date})` : ''}`;
+            return `• ${t.taskTitle} — ${t.priceUah} грн${date ? ` (${date})` : ''}`;
           })
           .join('\n')
-      : '<i>No task details available.</i>';
+      : ADMIN_PAYOUT_NO_TASK_DETAILS;
 
   const kb = new InlineKeyboard()
-    .text(`✅ Mark as Paid (${parseFloat(balance).toFixed(2)} UAH)`, `admin:payout:confirm:${user.id}`)
+    .text(
+      KB.MARK_PAID(parseFloat(balance).toFixed(2)),
+      `admin:payout:confirm:${user.id}`,
+    )
     .row();
 
   if (paymentInfo.hasEncryptedCard) {
-    kb.text('🔓 Show Full Card', `admin:payout:show_card:${user.id}`).row();
+    kb.text(KB.SHOW_FULL_CARD, `admin:payout:show_card:${user.id}`).row();
   }
 
-  kb.text('◀ Back to Queue', 'admin:payouts');
+  kb.text(KB.BACK_QUEUE, 'admin:payouts');
 
   await ctx.editMessageText(
-    `👤 <b>${name}</b>\n` +
-      `Telegram ID: <code>${user.telegramId}</code>\n\n` +
-      `💰 Balance due: <b>${parseFloat(balance).toFixed(2)} UAH</b>\n\n` +
-      `<b>Payment methods:</b>\n${paymentLines || '<i>None on file</i>'}\n\n` +
-      `<b>Completed tasks (current cycle):</b>\n${taskLines}`,
+    ADMIN_PAYOUT_DETAIL(name, user.telegramId, parseFloat(balance).toFixed(2), paymentLines, taskLines),
     { parse_mode: 'HTML', reply_markup: kb },
   );
 }
@@ -115,7 +129,7 @@ export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): 
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
   if (!item) {
-    await ctx.answerCallbackQuery({ text: '❌ User no longer eligible', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_NO_LONGER_ELIGIBLE, show_alert: true });
     return;
   }
 
@@ -124,16 +138,12 @@ export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): 
     : item.user.firstName ?? item.user.telegramId;
 
   await ctx.editMessageText(
-    `⚠️ <b>Confirm Payout</b>\n\n` +
-      `User: <b>${name}</b>\n` +
-      `Amount: <b>${parseFloat(item.balance).toFixed(2)} UAH</b>\n\n` +
-      `Have you already sent the payment outside the bot?\n` +
-      `Clicking confirm will reset their balance to 0 UAH.`,
+    ADMIN_PAYOUT_CONFIRM(name, parseFloat(item.balance).toFixed(2)),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('✅ Yes, Paid', `admin:payout:mark_paid:${userId}`)
-        .text('❌ Cancel', `admin:payout:view:${userId}`),
+        .text(KB.YES_PAID, `admin:payout:mark_paid:${userId}`)
+        .text(KB.CANCEL, `admin:payout:view:${userId}`),
     },
   );
 }
@@ -147,37 +157,27 @@ export async function handleAdminPayoutMarkPaid(ctx: MyContext, userId: number):
   const result = await processUserPayout(userId, adminUser?.id ?? 0);
 
   if (!result) {
-    await ctx.answerCallbackQuery({
-      text: '❌ Payout failed — user may no longer be eligible',
-      show_alert: true,
-    });
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_FAILED, show_alert: true });
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: '✅ Payout recorded!' });
+  await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_RECORDED_LABEL });
 
   await ctx.editMessageText(
-    `✅ <b>Payout #${result.payoutId} recorded</b>\n\n` +
-      `User: ${result.userName}\n` +
-      `Amount: <b>${parseFloat(result.amount).toFixed(2)} UAH</b>\n` +
-      `Balance reset to 0.`,
+    ADMIN_PAYOUT_RECORDED_TEXT(result.payoutId, result.userName, parseFloat(result.amount).toFixed(2)),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text('💰 Back to Queue', 'admin:payouts')
+        .text(KB.BACK_QUEUE, 'admin:payouts')
         .row()
-        .text('◀ Admin Menu', 'admin:menu'),
+        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
     },
   );
 
-  // Notify user
   try {
     await ctx.api.sendMessage(
       result.userTelegramId,
-      `💸 <b>Payment sent!</b>\n\n` +
-        `You have received <b>${parseFloat(result.amount).toFixed(2)} UAH</b>.\n` +
-        `Your balance has been reset to 0.\n\n` +
-        `Keep completing tasks to earn more!`,
+      ADMIN_PAYOUT_NOTIFY(parseFloat(result.amount).toFixed(2)),
       { parse_mode: 'HTML' },
     );
   } catch {
@@ -194,25 +194,21 @@ export async function handleAdminPayoutShowCard(ctx: MyContext, userId: number):
   const item = queue.find((q) => q.user.id === userId);
 
   if (!item) {
-    await ctx.answerCallbackQuery({ text: '❌ User not found', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_USER_NOT_FOUND, show_alert: true });
     return;
   }
 
   const card = getDecryptedCard(item.user);
 
   if (!card) {
-    await ctx.answerCallbackQuery({ text: 'No card on file', show_alert: true });
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_NO_CARD, show_alert: true });
     return;
   }
 
   const formatted = card.replace(/(\d{4})/g, '$1 ').trim();
 
-  const msg = await ctx.reply(
-    `🔓 <b>Full Card Number</b>\n\n<code>${formatted}</code>\n\n⚠️ This message will be deleted in 60 seconds.`,
-    { parse_mode: 'HTML' },
-  );
+  const msg = await ctx.reply(ADMIN_PAYOUT_SHOW_CARD(formatted), { parse_mode: 'HTML' });
 
-  // Schedule deletion
   setTimeout(async () => {
     try {
       await ctx.api.deleteMessage(ctx.chat!.id, msg.message_id);
