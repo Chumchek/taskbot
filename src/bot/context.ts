@@ -8,6 +8,7 @@ export type TaskCreationStep =
   | 'awaiting_link'
   | 'awaiting_price'
   | 'awaiting_slots'
+  | 'awaiting_deadline'
   | 'confirming';
 
 export type ReportStep = 'awaiting_media';
@@ -18,6 +19,7 @@ export interface PendingTask {
   link?: string;
   priceUah?: string;
   slotsTotal?: number;
+  deadlineHours?: number;
 }
 
 export interface PendingReportFile {

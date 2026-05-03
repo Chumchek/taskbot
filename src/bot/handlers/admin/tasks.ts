@@ -9,7 +9,7 @@ import {
   toggleTaskActive,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
-import { isValidUrl, isValidPrice, isValidSlots } from '../../../utils/validators';
+import { isValidUrl, isValidPrice, isValidSlots, isValidDeadlineHours } from '../../../utils/validators';
 
 // ── Admin task list ─────────────────────────────────────────────────────────
 
@@ -45,12 +45,17 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
   }
 
   const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
+  const deadlineLabel =
+    task.deadlineHours % 24 === 0
+      ? `${task.deadlineHours / 24}d`
+      : `${task.deadlineHours}h`;
   const text =
     `<b>${task.title}</b>\n\n` +
     (task.description ? `📝 ${task.description}\n\n` : '') +
     `🔗 <a href="${task.link}">Task Link</a>\n` +
     `💰 Price: <b>${task.priceUah} UAH</b>\n` +
     `👥 Slots: ${task.slotsAvailable}/${task.slotsTotal}\n` +
+    `⏰ Deadline: <b>${deadlineLabel}</b>\n` +
     `Status: ${status}`;
 
   await ctx.editMessageText(text, {
@@ -76,12 +81,17 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
 
   // Refresh the detail view in-place
   const status = task.isActive ? '🟢 Active' : '🔴 Inactive';
+  const deadlineLabel =
+    task.deadlineHours % 24 === 0
+      ? `${task.deadlineHours / 24}d`
+      : `${task.deadlineHours}h`;
   const text =
     `<b>${task.title}</b>\n\n` +
     (task.description ? `📝 ${task.description}\n\n` : '') +
     `🔗 <a href="${task.link}">Task Link</a>\n` +
     `💰 Price: <b>${task.priceUah} UAH</b>\n` +
     `👥 Slots: ${task.slotsAvailable}/${task.slotsTotal}\n` +
+    `⏰ Deadline: <b>${deadlineLabel}</b>\n` +
     `Status: ${status}`;
 
   await ctx.editMessageText(text, {
@@ -147,7 +157,7 @@ export async function handleAdminTaskCreate(ctx: MyContext): Promise<void> {
   ctx.session.pendingTask = {};
 
   await ctx.editMessageText(
-    `➕ <b>New Task — Step 1/5</b>\n\nEnter the task <b>title</b>:\n<i>(max 100 characters)</i>`,
+    `➕ <b>New Task — Step 1/6</b>\n\nEnter the task <b>title</b>:\n<i>(max 100 characters)</i>`,
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
@@ -170,7 +180,7 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     ctx.session.taskStep = 'awaiting_description';
 
     await ctx.reply(
-      `✅ Title: <b>${text}</b>\n\n<b>Step 2/5:</b> Enter a description:\n<i>(optional, max 500 chars)</i>`,
+      `✅ Title: <b>${text}</b>\n\n<b>Step 2/6:</b> Enter a description:\n<i>(optional, max 500 chars)</i>`,
       {
         parse_mode: 'HTML',
         reply_markup: new InlineKeyboard()
@@ -190,7 +200,7 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     ctx.session.taskStep = 'awaiting_link';
 
     await ctx.reply(
-      `✅ Description saved.\n\n<b>Step 3/5:</b> Enter the task <b>link</b> (URL):`,
+      `✅ Description saved.\n\n<b>Step 3/6:</b> Enter the task <b>link</b> (URL):`,
       {
         parse_mode: 'HTML',
         reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
@@ -208,7 +218,7 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     ctx.session.taskStep = 'awaiting_price';
 
     await ctx.reply(
-      `✅ Link saved.\n\n<b>Step 4/5:</b> Enter the <b>payment amount</b> in UAH:\n<i>(e.g. 50 or 75.50)</i>`,
+      `✅ Link saved.\n\n<b>Step 4/6:</b> Enter the <b>payment amount</b> in UAH:\n<i>(e.g. 50 or 75.50)</i>`,
       {
         parse_mode: 'HTML',
         reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
@@ -226,7 +236,7 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     ctx.session.taskStep = 'awaiting_slots';
 
     await ctx.reply(
-      `✅ Price: <b>${text} UAH</b>\n\n<b>Step 5/5:</b> Enter the number of <b>available slots</b>:\n<i>(how many users can claim this task)</i>`,
+      `✅ Price: <b>${text} UAH</b>\n\n<b>Step 5/6:</b> Enter the number of <b>available slots</b>:\n<i>(how many users can claim this task)</i>`,
       {
         parse_mode: 'HTML',
         reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
@@ -236,15 +246,39 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
   }
 
   if (taskStep === 'awaiting_slots') {
-    const slots = parseInt(text, 10);
     if (!isValidSlots(text)) {
       await ctx.reply('❌ Invalid number. Enter a positive integer (max 1000):');
       return;
     }
 
-    const task = { ...pendingTask, slotsTotal: slots };
+    ctx.session.pendingTask = { ...pendingTask, slotsTotal: parseInt(text, 10) };
+    ctx.session.taskStep = 'awaiting_deadline';
+
+    await ctx.reply(
+      `✅ Slots: <b>${text}</b>\n\n<b>Step 6/6:</b> Enter the <b>deadline</b> in hours:\n<i>(how long users have to complete the task after claiming, e.g. 24, 48, 72)</i>`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
+      },
+    );
+    return;
+  }
+
+  if (taskStep === 'awaiting_deadline') {
+    if (!isValidDeadlineHours(text)) {
+      await ctx.reply('❌ Invalid value. Enter a number of hours between 1 and 720:');
+      return;
+    }
+
+    const deadlineHours = parseInt(text, 10);
+    const task = { ...pendingTask, deadlineHours };
     ctx.session.pendingTask = task;
     ctx.session.taskStep = 'confirming';
+
+    const deadlineLabel =
+      deadlineHours % 24 === 0
+        ? `${deadlineHours / 24} day${deadlineHours / 24 === 1 ? '' : 's'}`
+        : `${deadlineHours} hours`;
 
     const summary =
       `📋 <b>Task Summary</b>\n\n` +
@@ -252,7 +286,8 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
       (task.description ? `Description: ${task.description}\n` : '') +
       `Link: <a href="${task.link}">${task.link}</a>\n` +
       `Price: <b>${task.priceUah} UAH</b>\n` +
-      `Slots: <b>${slots}</b>\n\n` +
+      `Slots: <b>${task.slotsTotal}</b>\n` +
+      `Deadline: <b>${deadlineLabel}</b>\n\n` +
       `Create this task?`;
 
     await ctx.reply(summary, {
@@ -270,7 +305,7 @@ export async function handleAdminTaskSkipDesc(ctx: MyContext): Promise<void> {
   ctx.session.taskStep = 'awaiting_link';
 
   await ctx.editMessageText(
-    `<b>Step 3/5:</b> Enter the task <b>link</b> (URL):`,
+    `<b>Step 3/6:</b> Enter the task <b>link</b> (URL):`,
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard().text('❌ Cancel', 'admin:task:cancel_create'),
@@ -286,7 +321,8 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
     !pendingTask?.title ||
     !pendingTask.link ||
     !pendingTask.priceUah ||
-    !pendingTask.slotsTotal
+    !pendingTask.slotsTotal ||
+    !pendingTask.deadlineHours
   ) {
     await ctx.editMessageText('❌ Incomplete task data. Please start over.', {
       reply_markup: adminMenuKeyboard(),
@@ -304,6 +340,7 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
     link: pendingTask.link,
     priceUah: pendingTask.priceUah,
     slotsTotal: pendingTask.slotsTotal,
+    deadlineHours: pendingTask.deadlineHours,
     createdBy: adminUser?.id ?? null,
   });
 

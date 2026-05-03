@@ -16,3 +16,9 @@ export function isValidSlots(value: string): boolean {
   const n = parseInt(value, 10);
   return n > 0 && n <= 1000;
 }
+
+export function isValidDeadlineHours(value: string): boolean {
+  if (!/^\d+$/.test(value)) return false;
+  const n = parseInt(value, 10);
+  return n >= 1 && n <= 720; // 1 hour to 30 days
+}

@@ -11,6 +11,7 @@ export interface CreateTaskInput {
   link: string;
   priceUah: string;
   slotsTotal: number;
+  deadlineHours: number;
   createdBy?: number | null;
 }
 
@@ -102,7 +103,7 @@ export async function claimTask(userId: number, taskId: number): Promise<ClaimRe
 
     if (!updated) return { success: false, reason: 'unavailable' };
 
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + updated.deadlineHours * 60 * 60 * 1000);
     const [assignment] = await tx
       .insert(assignments)
       .values({ userId, taskId, expiresAt })

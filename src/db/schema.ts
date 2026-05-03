@@ -36,6 +36,7 @@ export const tasks = pgTable('tasks', {
   priceUah: decimal('price_uah', { precision: 10, scale: 2 }).notNull(),
   slotsTotal: integer('slots_total').notNull(),
   slotsAvailable: integer('slots_available').notNull(),
+  deadlineHours: integer('deadline_hours').notNull().default(24),
   isActive: boolean('is_active').notNull().default(true),
   createdBy: integer('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
