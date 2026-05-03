@@ -16,7 +16,7 @@ export function mainMenuKeyboard(): InlineKeyboard {
 export function userTaskListKeyboard(tasks: Task[], claimedIds: Set<number>): InlineKeyboard {
   const kb = new InlineKeyboard();
   for (const task of tasks) {
-    const label = claimedIds.has(task.id) ? `✅ ${task.title}` : `📌 ${task.title}`;
+    const label = claimedIds.has(task.id) ? `⏳ ${task.title}` : `🟢 ${task.title}`;
     kb.text(label, `user:task:view:${task.id}`).row();
   }
   kb.text('◀ Назад', 'user:menu');

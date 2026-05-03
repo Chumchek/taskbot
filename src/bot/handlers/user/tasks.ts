@@ -55,8 +55,8 @@ export async function handleUserTaskList(ctx: MyContext): Promise<void> {
 
   const lines = activeTasks
     .map((t) => {
-      const claimed = claimedIds.has(t.id) ? ' ✅' : '';
-      return `• <b>${t.title}</b>${claimed} — ${t.priceUah} грн (${t.slotsAvailable} место${t.slotsAvailable === 1 ? '' : 'а'})`;
+      const emoji = claimedIds.has(t.id) ? '⏳' : '🟢';
+      return `${emoji} <b>${t.title}</b> — ${t.priceUah} грн (${t.slotsAvailable} мест)`;
     })
     .join('\n');
 
