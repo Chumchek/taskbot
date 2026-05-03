@@ -24,6 +24,9 @@
     "pg": "^8.13.0",
     "zod": "^3.23.8"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@types/node": "^22.7.5",
     "@types/pg": "^8.11.10",
