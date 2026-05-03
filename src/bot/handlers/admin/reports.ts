@@ -111,7 +111,13 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
       `Task: ${result.taskTitle}\n` +
       `User: ${result.userTelegramId}\n` +
       `+${result.priceUah} UAH credited | New balance: ${result.newBalance} UAH`,
-    { parse_mode: 'HTML' },
+    {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text('📊 Back to Reports', 'admin:reports')
+        .row()
+        .text('◀ Admin Menu', 'admin:menu'),
+    },
   );
 
   try {
@@ -172,7 +178,13 @@ export async function handleAdminReportReject(
     await ctx.editMessageText(
       `❌ <b>Report #${reportId} rejected</b>\n` +
         (comment ? `Reason: ${comment}` : '<i>No reason given.</i>'),
-      { parse_mode: 'HTML' },
+      {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard()
+          .text('📊 Back to Reports', 'admin:reports')
+          .row()
+          .text('◀ Admin Menu', 'admin:menu'),
+      },
     );
   }
 
@@ -201,9 +213,14 @@ export async function handleAdminRejectCommentText(
 
   await handleAdminReportReject(ctx, reportId, comment);
 
-  // Send a new message since the context is a text message (not callback)
   await ctx.reply(
     `❌ <b>Report #${reportId} rejected</b>\nReason: ${comment}`,
-    { parse_mode: 'HTML' },
+    {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text('📊 Back to Reports', 'admin:reports')
+        .row()
+        .text('◀ Admin Menu', 'admin:menu'),
+    },
   );
 }
