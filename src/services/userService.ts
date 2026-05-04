@@ -50,6 +50,16 @@ export async function demoteUser(telegramId: string): Promise<User | undefined> 
   return user;
 }
 
+// Returns all admin telegram IDs: env-based super-admins + DB-promoted admins.
+export async function getAllAdminIds(): Promise<string[]> {
+  const dbAdmins = await db
+    .select({ telegramId: users.telegramId })
+    .from(users)
+    .where(eq(users.isAdmin, true));
+  const dbIds = dbAdmins.map((u) => u.telegramId);
+  return [...new Set([...config.admins, ...dbIds])];
+}
+
 // Returns true if telegramId is an env-based super-admin OR has is_admin flag in DB.
 export async function isAdmin(telegramId: string): Promise<boolean> {
   if (config.admins.includes(telegramId)) return true;

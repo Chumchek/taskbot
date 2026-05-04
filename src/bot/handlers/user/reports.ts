@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
-import { getUserByTelegramId } from '../../../services/userService';
+import { getUserByTelegramId, getAllAdminIds } from '../../../services/userService';
 import { getTaskById, getUserAssignments } from '../../../services/taskService';
 import { createReport, addReportMedia, getUserReports } from '../../../services/reportService';
 import {
@@ -8,7 +8,6 @@ import {
   makeStorageKey,
   uploadFile,
 } from '../../../services/storageService';
-import { config } from '../../../config';
 import {
   KB,
   MENU,
@@ -229,7 +228,7 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
     });
   }
 
-  for (const adminId of config.admins) {
+  for (const adminId of await getAllAdminIds()) {
     try {
       const userName = ctx.from?.username
         ? `@${ctx.from.username}`

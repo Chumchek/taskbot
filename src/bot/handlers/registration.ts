@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { encrypt, maskCard } from '../../services/crypto';
-import { config } from '../../config';
+import { getAllAdminIds } from '../../services/userService';
 import { MyContext } from '../context';
 import {
   approveUserKeyboard,
@@ -73,7 +73,7 @@ export async function completeRegistration(
     .filter(Boolean)
     .join('\n');
 
-  for (const adminId of config.admins) {
+  for (const adminId of await getAllAdminIds()) {
     try {
       await ctx.api.sendMessage(
         adminId,
