@@ -22,6 +22,7 @@ import {
   handlePendingUsers,
   handlePromoteCommand,
   handleRejectUser,
+  handleUnbanCommand,
 } from './handlers/admin/users';
 
 // Handlers — admin tasks
@@ -120,6 +121,7 @@ export function createBot(): Bot<MyContext> {
   // ── Admin commands ───────────────────────────────────────────────────────
   bot.command('admin', adminOnly, handleAdminCommand);
   bot.command('promote', adminOnly, handlePromoteCommand);
+  bot.command('unban', adminOnly, handleUnbanCommand);
 
   // ── Admin menu callbacks ─────────────────────────────────────────────────
   bot.callbackQuery('admin:menu', adminOnly, handleAdminMenu);
