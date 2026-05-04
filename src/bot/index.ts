@@ -19,6 +19,7 @@ import {
 import { handleAdminCommand, handleAdminMenu } from './handlers/admin/index';
 import {
   handleApproveUser,
+  handleBanCommand,
   handlePendingUsers,
   handlePromoteCommand,
   handleRejectUser,
@@ -121,6 +122,7 @@ export function createBot(): Bot<MyContext> {
   // ── Admin commands ───────────────────────────────────────────────────────
   bot.command('admin', adminOnly, handleAdminCommand);
   bot.command('promote', adminOnly, handlePromoteCommand);
+  bot.command('ban', adminOnly, handleBanCommand);
   bot.command('unban', adminOnly, handleUnbanCommand);
 
   // ── Admin menu callbacks ─────────────────────────────────────────────────

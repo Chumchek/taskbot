@@ -11,7 +11,7 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 
-export const userStatusEnum = pgEnum('user_status', ['pending', 'approved', 'rejected']);
+export const userStatusEnum = pgEnum('user_status', ['pending', 'approved', 'rejected', 'banned']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['claimed', 'completed', 'expired']);
 export const reportStatusEnum = pgEnum('report_status', ['pending', 'approved', 'rejected']);
 

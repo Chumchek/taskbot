@@ -21,6 +21,7 @@ function pluralFiles(n: number): string {
 export const AUTH_NOT_REGISTERED = '⚠️ Используйте /start для регистрации.';
 export const AUTH_PENDING = '⏳ Ваша регистрация ожидает подтверждения администратора. Вы получите уведомление после одобрения.';
 export const AUTH_REJECTED = '❌ Ваша регистрация отклонена. Свяжитесь с администратором.';
+export const AUTH_BANNED = '🚫 Ваш доступ к боту заблокирован. Свяжитесь с администратором.';
 
 // ── Registration ───────────────────────────────────────────────────────────
 
@@ -78,6 +79,12 @@ export const ADMIN_USER_APPROVED = (name: string) => `✅ <b>Одобрен:</b>
 export const ADMIN_USER_REJECTED = (name: string) => `❌ <b>Отклонён:</b> ${name}`;
 export const ADMIN_USER_ALREADY_HANDLED = (resultText: string) => `${resultText}\n\n<i>Обработано другим администратором</i>`;
 export const ADMIN_USER_NOT_FOUND = '❌ Пользователь не найден';
+export const ADMIN_BAN_USAGE = 'Использование: /ban <telegram_id>\n\nПример: /ban 123456789';
+export const ADMIN_BAN_NOT_FOUND = (id: string) =>
+  `❌ Пользователь с Telegram ID <code>${id}</code> не найден.`;
+export const ADMIN_BANNED = (name: string) => `🚫 <b>${name}</b> заблокирован.`;
+export const ADMIN_BAN_NOTIFY = '🚫 Ваш доступ к боту заблокирован администратором.';
+
 export const ADMIN_UNBAN_USAGE = 'Использование: /unban <telegram_id>\n\nПример: /unban 123456789';
 export const ADMIN_UNBAN_NOT_FOUND = (id: string) =>
   `❌ Пользователь с Telegram ID <code>${id}</code> не найден.`;

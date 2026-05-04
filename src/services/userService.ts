@@ -41,6 +41,15 @@ export async function unbanUser(telegramId: string): Promise<User | undefined> {
   return user;
 }
 
+export async function banUser(telegramId: string): Promise<User | undefined> {
+  const [user] = await db
+    .update(users)
+    .set({ status: 'banned' })
+    .where(eq(users.telegramId, telegramId))
+    .returning();
+  return user;
+}
+
 export async function promoteUser(telegramId: string): Promise<User | undefined> {
   const [user] = await db
     .update(users)

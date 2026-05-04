@@ -1,6 +1,6 @@
 import { MyContext } from '../../context';
 import { adminMenuKeyboard, approveUserKeyboard } from '../../keyboards';
-import { approveUser, deleteAdminNotifications, getAdminNotifications, getPendingUsers, promoteUser, rejectUser, unbanUser } from '../../../services/userService';
+import { approveUser, banUser, deleteAdminNotifications, getAdminNotifications, getPendingUsers, promoteUser, rejectUser, unbanUser } from '../../../services/userService';
 import { decrypt, maskCard } from '../../../services/crypto';
 import {
   ADMIN_NO_PENDING_USERS,
@@ -10,6 +10,10 @@ import {
   ADMIN_USER_REJECTED,
   ADMIN_USER_NOT_FOUND,
   ADMIN_USER_ALREADY_HANDLED,
+  ADMIN_BAN_USAGE,
+  ADMIN_BAN_NOT_FOUND,
+  ADMIN_BANNED,
+  ADMIN_BAN_NOTIFY,
   ADMIN_PROMOTE_USAGE,
   ADMIN_PROMOTE_NOT_FOUND,
   ADMIN_PROMOTED,
@@ -121,6 +125,31 @@ export async function handleRejectUser(ctx: MyContext, telegramId: string): Prom
 
   try {
     await ctx.api.sendMessage(telegramId, REG_REJECTED_NOTIFY);
+  } catch {
+    // User may have blocked the bot
+  }
+}
+
+export async function handleBanCommand(ctx: MyContext): Promise<void> {
+  const args = ctx.message?.text?.split(' ').slice(1).join(' ').trim();
+
+  if (!args) {
+    await ctx.reply(ADMIN_BAN_USAGE);
+    return;
+  }
+
+  const user = await banUser(args);
+
+  if (!user) {
+    await ctx.reply(ADMIN_BAN_NOT_FOUND(args), { parse_mode: 'HTML' });
+    return;
+  }
+
+  const name = user.username ? `@${user.username}` : user.firstName ?? args;
+  await ctx.reply(ADMIN_BANNED(name), { parse_mode: 'HTML' });
+
+  try {
+    await ctx.api.sendMessage(args, ADMIN_BAN_NOTIFY);
   } catch {
     // User may have blocked the bot
   }

@@ -1,7 +1,7 @@
 import { NextFunction } from 'grammy';
 import { MyContext } from '../context';
 import { isAdmin, getUserByTelegramId } from '../../services/userService';
-import { AUTH_NOT_REGISTERED, AUTH_PENDING, AUTH_REJECTED } from '../../i18n/ru';
+import { AUTH_NOT_REGISTERED, AUTH_PENDING, AUTH_REJECTED, AUTH_BANNED } from '../../i18n/ru';
 
 // Global guard that runs on every update (after session middleware).
 // Blocks unapproved/unregistered users from accessing bot features.
@@ -40,6 +40,11 @@ export async function approvedOnly(ctx: MyContext, next: NextFunction): Promise<
 
   if (user.status === 'rejected') {
     await replyOrAlert(ctx, AUTH_REJECTED);
+    return;
+  }
+
+  if (user.status === 'banned') {
+    await replyOrAlert(ctx, AUTH_BANNED);
     return;
   }
 
