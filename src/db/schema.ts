@@ -115,3 +115,10 @@ export const sessions = pgTable('sessions', {
   data: jsonb('data').notNull(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const adminNotifications = pgTable('admin_notifications', {
+  id: serial('id').primaryKey(),
+  targetTelegramId: text('target_telegram_id').notNull(),
+  adminChatId: text('admin_chat_id').notNull(),
+  messageId: integer('message_id').notNull(),
+});

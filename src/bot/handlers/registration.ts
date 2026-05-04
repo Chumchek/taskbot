@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { encrypt, maskCard } from '../../services/crypto';
-import { getAllAdminIds } from '../../services/userService';
+import { getAllAdminIds, saveAdminNotification } from '../../services/userService';
 import { MyContext } from '../context';
 import {
   approveUserKeyboard,
@@ -75,7 +75,7 @@ export async function completeRegistration(
 
   for (const adminId of await getAllAdminIds()) {
     try {
-      await ctx.api.sendMessage(
+      const sent = await ctx.api.sendMessage(
         adminId,
         REG_ADMIN_NEW_USER(userName, telegramId, paymentLines),
         {
@@ -83,6 +83,7 @@ export async function completeRegistration(
           reply_markup: approveUserKeyboard(telegramId),
         },
       );
+      await saveAdminNotification(telegramId, adminId, sent.message_id);
     } catch {
       // Admin may not have started the bot
     }

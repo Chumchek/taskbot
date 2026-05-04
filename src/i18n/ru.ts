@@ -76,6 +76,7 @@ export const ADMIN_PENDING_USERS_HEADER = (count: number) =>
 export const ADMIN_USER_NO_PAYMENT = '<i>Нет платёжных данных</i>';
 export const ADMIN_USER_APPROVED = (name: string) => `✅ <b>Одобрен:</b> ${name}`;
 export const ADMIN_USER_REJECTED = (name: string) => `❌ <b>Отклонён:</b> ${name}`;
+export const ADMIN_USER_ALREADY_HANDLED = (resultText: string) => `${resultText}\n\n<i>Обработано другим администратором</i>`;
 export const ADMIN_USER_NOT_FOUND = '❌ Пользователь не найден';
 export const ADMIN_PROMOTE_USAGE = 'Использование: /promote <telegram_id>\n\nПример: /promote 123456789';
 export const ADMIN_PROMOTE_NOT_FOUND = (id: string) =>

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, adminNotifications } from '../db/schema';
 import { config } from '../config';
 
 export type User = typeof users.$inferSelect;
@@ -58,6 +58,27 @@ export async function getAllAdminIds(): Promise<string[]> {
     .where(eq(users.isAdmin, true));
   const dbIds = dbAdmins.map((u) => u.telegramId);
   return [...new Set([...config.admins, ...dbIds])];
+}
+
+export async function saveAdminNotification(
+  targetTelegramId: string,
+  adminChatId: string,
+  messageId: number,
+): Promise<void> {
+  await db.insert(adminNotifications).values({ targetTelegramId, adminChatId, messageId });
+}
+
+export async function getAdminNotifications(
+  targetTelegramId: string,
+): Promise<{ adminChatId: string; messageId: number }[]> {
+  return db
+    .select({ adminChatId: adminNotifications.adminChatId, messageId: adminNotifications.messageId })
+    .from(adminNotifications)
+    .where(eq(adminNotifications.targetTelegramId, targetTelegramId));
+}
+
+export async function deleteAdminNotifications(targetTelegramId: string): Promise<void> {
+  await db.delete(adminNotifications).where(eq(adminNotifications.targetTelegramId, targetTelegramId));
 }
 
 // Returns true if telegramId is an env-based super-admin OR has is_admin flag in DB.

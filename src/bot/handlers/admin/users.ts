@@ -1,6 +1,6 @@
 import { MyContext } from '../../context';
 import { adminMenuKeyboard, approveUserKeyboard } from '../../keyboards';
-import { approveUser, getPendingUsers, promoteUser, rejectUser } from '../../../services/userService';
+import { approveUser, deleteAdminNotifications, getAdminNotifications, getPendingUsers, promoteUser, rejectUser } from '../../../services/userService';
 import { decrypt, maskCard } from '../../../services/crypto';
 import {
   ADMIN_NO_PENDING_USERS,
@@ -9,6 +9,7 @@ import {
   ADMIN_USER_APPROVED,
   ADMIN_USER_REJECTED,
   ADMIN_USER_NOT_FOUND,
+  ADMIN_USER_ALREADY_HANDLED,
   ADMIN_PROMOTE_USAGE,
   ADMIN_PROMOTE_NOT_FOUND,
   ADMIN_PROMOTED,
@@ -51,6 +52,7 @@ export async function handlePendingUsers(ctx: MyContext): Promise<void> {
 }
 
 export async function handleApproveUser(ctx: MyContext, telegramId: string): Promise<void> {
+  const notifications = await getAdminNotifications(telegramId);
   const user = await approveUser(telegramId);
 
   if (!user) {
@@ -60,7 +62,23 @@ export async function handleApproveUser(ctx: MyContext, telegramId: string): Pro
 
   await ctx.answerCallbackQuery({ text: '✅ Одобрено!' });
   const name = user.username ? `@${user.username}` : user.firstName ?? telegramId;
-  await ctx.editMessageText(ADMIN_USER_APPROVED(name), { parse_mode: 'HTML' });
+  const resultText = ADMIN_USER_APPROVED(name);
+
+  await ctx.editMessageText(resultText, { parse_mode: 'HTML' });
+  await deleteAdminNotifications(telegramId);
+
+  const currentChatId = ctx.chat?.id.toString();
+  const currentMessageId = ctx.callbackQuery?.message?.message_id;
+  for (const { adminChatId, messageId } of notifications) {
+    if (adminChatId === currentChatId && messageId === currentMessageId) continue;
+    try {
+      await ctx.api.editMessageText(adminChatId, messageId, ADMIN_USER_ALREADY_HANDLED(resultText), {
+        parse_mode: 'HTML',
+      });
+    } catch {
+      // Message may already be deleted or too old
+    }
+  }
 
   try {
     await ctx.api.sendMessage(telegramId, REG_APPROVED_NOTIFY, { parse_mode: 'HTML' });
@@ -70,6 +88,7 @@ export async function handleApproveUser(ctx: MyContext, telegramId: string): Pro
 }
 
 export async function handleRejectUser(ctx: MyContext, telegramId: string): Promise<void> {
+  const notifications = await getAdminNotifications(telegramId);
   const user = await rejectUser(telegramId);
 
   if (!user) {
@@ -79,7 +98,23 @@ export async function handleRejectUser(ctx: MyContext, telegramId: string): Prom
 
   await ctx.answerCallbackQuery({ text: '❌ Отклонено' });
   const name = user.username ? `@${user.username}` : user.firstName ?? telegramId;
-  await ctx.editMessageText(ADMIN_USER_REJECTED(name), { parse_mode: 'HTML' });
+  const resultText = ADMIN_USER_REJECTED(name);
+
+  await ctx.editMessageText(resultText, { parse_mode: 'HTML' });
+  await deleteAdminNotifications(telegramId);
+
+  const currentChatId = ctx.chat?.id.toString();
+  const currentMessageId = ctx.callbackQuery?.message?.message_id;
+  for (const { adminChatId, messageId } of notifications) {
+    if (adminChatId === currentChatId && messageId === currentMessageId) continue;
+    try {
+      await ctx.api.editMessageText(adminChatId, messageId, ADMIN_USER_ALREADY_HANDLED(resultText), {
+        parse_mode: 'HTML',
+      });
+    } catch {
+      // Message may already be deleted or too old
+    }
+  }
 
   try {
     await ctx.api.sendMessage(telegramId, REG_REJECTED_NOTIFY);
