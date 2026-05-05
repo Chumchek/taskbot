@@ -136,15 +136,17 @@ export type ClaimResult =
   | { success: true; assignment: Assignment }
   | { success: false; reason: 'unavailable' | 'already_claimed' };
 
-// Atomically decrements a slot and creates an assignment in a single transaction.
+// Atomically decrements a slot and creates (or reactivates) an assignment.
 export async function claimTask(userId: number, taskId: number): Promise<ClaimResult> {
   return db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: assignments.id })
+      .select({ id: assignments.id, status: assignments.status })
       .from(assignments)
       .where(and(eq(assignments.userId, userId), eq(assignments.taskId, taskId)));
 
-    if (existing) return { success: false, reason: 'already_claimed' };
+    if (existing && existing.status !== 'expired') {
+      return { success: false, reason: 'already_claimed' };
+    }
 
     // UPDATE only succeeds when task is active and slots_available > 0
     const [updated] = await tx
@@ -156,6 +158,17 @@ export async function claimTask(userId: number, taskId: number): Promise<ClaimRe
     if (!updated) return { success: false, reason: 'unavailable' };
 
     const expiresAt = new Date(Date.now() + updated.deadlineHours * 60 * 60 * 1000);
+
+    if (existing) {
+      // Reactivate the expired assignment instead of inserting a new one
+      const [assignment] = await tx
+        .update(assignments)
+        .set({ status: 'claimed', expiresAt, completedAt: null })
+        .where(eq(assignments.id, existing.id))
+        .returning();
+      return { success: true, assignment };
+    }
+
     const [assignment] = await tx
       .insert(assignments)
       .values({ userId, taskId, expiresAt })

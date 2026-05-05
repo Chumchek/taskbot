@@ -398,6 +398,7 @@ export const USER_TASK_HELP_NO_FILES = 'Нет вспомогательных м
 // ── User reports ───────────────────────────────────────────────────────────
 
 export const USER_REPORT_ASSIGNMENT_NOT_FOUND = '❌ Задание не найдено.';
+export const USER_REPORT_ALREADY_SUBMITTED = '⏳ Вы уже отправили отчёт по этому заданию. Ожидайте проверки администратором.';
 export const USER_REPORT_WRONG_STATUS = (status: string) =>
   `❌ Задание уже имеет статус: <b>${status}</b>.\n\nОтчёт можно отправить только для активных заданий.`;
 

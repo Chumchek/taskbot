@@ -1,7 +1,7 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, notExists, sql } from 'drizzle-orm';
 import { Api } from 'grammy';
 import { db } from '../db';
-import { assignments, tasks, users } from '../db/schema';
+import { assignments, reports, tasks, users } from '../db/schema';
 import { cleanupOldSessions } from '../db/sessionStore';
 import { deadlineLabel } from '../i18n/ru';
 
@@ -27,6 +27,11 @@ export async function expireAssignments(api?: Api): Promise<void> {
         eq(assignments.status, 'claimed'),
         isNotNull(assignments.expiresAt),
         sql`${assignments.expiresAt} < ${now}`,
+        notExists(
+          db.select({ id: reports.id })
+            .from(reports)
+            .where(and(eq(reports.assignmentId, assignments.id), eq(reports.status, 'pending'))),
+        ),
       ),
     );
 

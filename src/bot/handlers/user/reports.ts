@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
 import { getUserByTelegramId, getAllAdminIds } from '../../../services/userService';
 import { getTaskById, getUserAssignments } from '../../../services/taskService';
-import { createReport, addReportMedia, getUserReports } from '../../../services/reportService';
+import { createReport, addReportMedia, getUserReports, getActiveReportForAssignment } from '../../../services/reportService';
 import {
   downloadTelegramFile,
   makeStorageKey,
@@ -12,6 +12,7 @@ import {
   KB,
   MENU,
   USER_REPORT_ASSIGNMENT_NOT_FOUND,
+  USER_REPORT_ALREADY_SUBMITTED,
   USER_REPORT_WRONG_STATUS,
   USER_REPORT_START_PROMPT,
   USER_REPORT_FILE_TOO_LARGE,
@@ -68,6 +69,14 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
         reply_markup: new InlineKeyboard().text(KB.BACK_MY_TASKS, 'user:my_tasks'),
       },
     );
+    return;
+  }
+
+  const existingReport = await getActiveReportForAssignment(assignmentId);
+  if (existingReport) {
+    await ctx.editMessageText(USER_REPORT_ALREADY_SUBMITTED, {
+      reply_markup: new InlineKeyboard().text(KB.BACK_MY_TASKS, 'user:my_tasks'),
+    });
     return;
   }
 

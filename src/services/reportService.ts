@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { assignments, media, reports, tasks, users } from '../db/schema';
 
@@ -168,34 +168,62 @@ export async function rejectReport(
   adminUserId: number,
   comment?: string,
 ): Promise<RejectionResult | null> {
-  const [row] = await db
-    .select({
-      report: reports,
-      user: { telegramId: users.telegramId },
-      task: { title: tasks.title },
-    })
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({
+        report: reports,
+        assignment: { id: assignments.id, taskId: assignments.taskId },
+        user: { telegramId: users.telegramId },
+        task: { title: tasks.title },
+      })
+      .from(reports)
+      .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
+      .innerJoin(users, eq(assignments.userId, users.id))
+      .innerJoin(tasks, eq(assignments.taskId, tasks.id))
+      .where(eq(reports.id, reportId));
+
+    if (!row || row.report.status !== 'pending') return null;
+
+    await tx
+      .update(reports)
+      .set({
+        status: 'rejected',
+        reviewedAt: new Date(),
+        reviewedBy: adminUserId,
+        adminComment: comment ?? null,
+      })
+      .where(eq(reports.id, reportId));
+
+    // Reset assignment so user can retry
+    await tx
+      .update(assignments)
+      .set({ status: 'expired' })
+      .where(eq(assignments.id, row.assignment.id));
+
+    // Restore the slot
+    await tx
+      .update(tasks)
+      .set({ slotsAvailable: sql`${tasks.slotsAvailable} + 1` })
+      .where(eq(tasks.id, row.assignment.taskId));
+
+    return {
+      userTelegramId: row.user.telegramId,
+      taskTitle: row.task.title,
+    };
+  });
+}
+
+export async function getActiveReportForAssignment(assignmentId: number): Promise<Report | null> {
+  const [report] = await db
+    .select()
     .from(reports)
-    .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
-    .innerJoin(users, eq(assignments.userId, users.id))
-    .innerJoin(tasks, eq(assignments.taskId, tasks.id))
-    .where(eq(reports.id, reportId));
-
-  if (!row || row.report.status !== 'pending') return null;
-
-  await db
-    .update(reports)
-    .set({
-      status: 'rejected',
-      reviewedAt: new Date(),
-      reviewedBy: adminUserId,
-      adminComment: comment ?? null,
-    })
-    .where(eq(reports.id, reportId));
-
-  return {
-    userTelegramId: row.user.telegramId,
-    taskTitle: row.task.title,
-  };
+    .where(
+      and(
+        eq(reports.assignmentId, assignmentId),
+        inArray(reports.status, ['pending', 'approved']),
+      ),
+    );
+  return report ?? null;
 }
 
 // ── User-facing report list ──────────────────────────────────────────────────
