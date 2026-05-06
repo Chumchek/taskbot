@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import type { Task } from '../services/taskService';
-import { KB, MENU } from '../i18n/ru';
+import { ALL_CATEGORY_KEYS } from '../services/reportExampleService';
+import { KB, MENU, CATEGORY_KEY_LABELS } from '../i18n/ru';
 
 // ── User keyboards ─────────────────────────────────────────────────────────
 
@@ -47,6 +48,8 @@ export function adminMenuKeyboard(): InlineKeyboard {
     .row()
     .text(MENU.ADMIN_PAYOUTS, 'admin:payouts')
     .row()
+    .text(MENU.ADMIN_REPORT_EXAMPLES, 'admin:rex')
+    .row()
     .text(MENU.ADMIN_USER_MENU, 'user:menu');
 }
 
@@ -74,6 +77,55 @@ export function adminTaskDetailKeyboard(taskId: number, isActive: boolean, media
     .text(MENU.ADMIN_HELP_MEDIA(mediaCount), `admin:task:media:${taskId}`)
     .row()
     .text(MENU.BACK_TO_TASKS_ADMIN, 'admin:tasks');
+}
+
+export function adminReportExampleListKeyboard(existingKeys: Set<string>): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const key of ALL_CATEGORY_KEYS) {
+    const label = CATEGORY_KEY_LABELS[key];
+    kb.text(`${existingKeys.has(key) ? '✅' : '⬜'} ${label}`, `admin:rex:cat:${key}`).row();
+  }
+  kb.text(KB.BACK_ADMIN, 'admin:menu');
+  return kb;
+}
+
+export function adminReportExampleDetailKeyboard(
+  categoryKey: string,
+  mediaCount: number,
+): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(KB.REX_COMMENT, `admin:rex:comment:${categoryKey}`)
+    .row()
+    .text(KB.REX_MEDIA(mediaCount), `admin:rex:media:${categoryKey}`)
+    .row()
+    .text(KB.REX_DELETE, `admin:rex:delete_confirm:${categoryKey}`)
+    .row()
+    .text(KB.BACK_REX, 'admin:rex');
+}
+
+export function adminReportExampleNoExampleKeyboard(categoryKey: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(KB.REX_CREATE, `admin:rex:create:${categoryKey}`)
+    .row()
+    .text(KB.BACK_REX, 'admin:rex');
+}
+
+export function adminReportExampleMediaKeyboard(
+  categoryKey: string,
+  fileCount: number,
+  max: number,
+): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  if (fileCount < max) {
+    kb.text(KB.ADD_MEDIA, `admin:rex:media:upload:${categoryKey}`).row();
+  }
+  if (fileCount > 0) {
+    kb.text(KB.PREVIEW, `admin:rex:media:preview:${categoryKey}`)
+      .text(KB.REMOVE_ALL, `admin:rex:media:clear_confirm:${categoryKey}`)
+      .row();
+  }
+  kb.text(KB.BACK_REX_DETAIL, `admin:rex:cat:${categoryKey}`);
+  return kb;
 }
 
 export function adminTaskCategoryKeyboard(): InlineKeyboard {

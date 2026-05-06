@@ -2,6 +2,8 @@ import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
 import { getUserByTelegramId, getAllAdminIds } from '../../../services/userService';
 import { getTaskById, getUserAssignments } from '../../../services/taskService';
+import { toCategoryKey, getExampleForUser } from '../../../services/reportExampleService';
+import { getPresignedUrl } from '../../../services/storageService';
 import { createReport, addReportMedia, getUserReports, getActiveReportForAssignment } from '../../../services/reportService';
 import {
   downloadTelegramFile,
@@ -11,6 +13,7 @@ import {
 import {
   KB,
   MENU,
+  USER_REPORT_EXAMPLE_HEADER,
   USER_REPORT_ASSIGNMENT_NOT_FOUND,
   USER_REPORT_ALREADY_SUBMITTED,
   USER_REPORT_WRONG_STATUS,
@@ -101,6 +104,26 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
 
   if (sent !== true) {
     ctx.session.pendingReport.promptMsgId = sent.message_id;
+  }
+
+  const exampleData = await getExampleForUser(toCategoryKey(assignment.task.category));
+  if (exampleData) {
+    const { example, media } = exampleData;
+    await ctx.reply(USER_REPORT_EXAMPLE_HEADER(example.comment), { parse_mode: 'HTML' });
+    for (const f of media) {
+      try {
+        if (f.telegramFileId) {
+          if (f.fileType === 'photo') await ctx.replyWithPhoto(f.telegramFileId);
+          else await ctx.replyWithVideo(f.telegramFileId);
+        } else {
+          const url = await getPresignedUrl(f.storageKey, 600);
+          await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+        }
+      } catch {
+        const url = await getPresignedUrl(f.storageKey, 600);
+        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+      }
+    }
   }
 }
 

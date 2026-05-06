@@ -64,6 +64,12 @@ export function makeTaskMediaKey(taskId: number, ext: string): string {
 }
 
 // Generates a unique R2 object key for a report media file.
+export function makeReportExampleKey(categoryKey: string, ext: string): string {
+  const ts = Date.now();
+  const rnd = Math.random().toString(36).slice(2, 7);
+  return `report-examples/${categoryKey}/${ts}_${rnd}.${ext}`;
+}
+
 export function makeStorageKey(
   telegramUserId: string,
   taskId: number,

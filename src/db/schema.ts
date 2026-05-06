@@ -112,6 +112,25 @@ export const taskMedia = pgTable('task_media', {
   uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
 });
 
+export const reportExamples = pgTable('report_examples', {
+  id: serial('id').primaryKey(),
+  categoryKey: text('category_key').notNull().unique(),
+  comment: text('comment'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const reportExampleMedia = pgTable('report_example_media', {
+  id: serial('id').primaryKey(),
+  exampleId: integer('example_id')
+    .notNull()
+    .references(() => reportExamples.id, { onDelete: 'cascade' }),
+  storageKey: text('storage_key').notNull(),
+  telegramFileId: text('telegram_file_id'),
+  fileType: text('file_type').notNull(),
+  fileSize: integer('file_size'),
+  uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
+});
+
 // Bot session persistence (replaces in-memory storage)
 export const sessions = pgTable('sessions', {
   key: text('key').primaryKey(),

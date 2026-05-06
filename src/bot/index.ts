@@ -73,6 +73,25 @@ import {
   handleTaskMediaVideo,
 } from './handlers/admin/taskMedia';
 
+// Handlers — admin report examples
+import {
+  handleAdminReportExampleList,
+  handleAdminReportExampleView,
+  handleAdminReportExampleCreate,
+  handleAdminReportExampleCommentAsk,
+  handleAdminReportExampleCommentText,
+  handleAdminReportExampleMedia,
+  handleAdminReportExampleMediaStartUpload,
+  handleAdminReportExampleMediaDone,
+  handleAdminReportExampleMediaPreview,
+  handleAdminReportExampleMediaClearConfirm,
+  handleAdminReportExampleMediaClear,
+  handleAdminReportExampleDeleteConfirm,
+  handleAdminReportExampleDelete,
+  handleReportExampleMediaPhoto,
+  handleReportExampleMediaVideo,
+} from './handlers/admin/reportExamples';
+
 // Handlers — user tasks
 import {
   handleUserMenu,
@@ -220,6 +239,40 @@ export function createBot(): Bot<MyContext> {
     handleAdminTaskMediaClear(ctx, parseInt(ctx.match[1], 10)),
   );
 
+  // ── Admin report example callbacks ──────────────────────────────────────
+  bot.callbackQuery('admin:rex', adminOnly, handleAdminReportExampleList);
+  bot.callbackQuery(/^admin:rex:cat:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleView(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:create:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleCreate(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:comment:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleCommentAsk(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:media:upload:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleMediaStartUpload(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery('admin:rex:media:done', adminOnly, handleAdminReportExampleMediaDone);
+  bot.callbackQuery(/^admin:rex:media:preview:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleMediaPreview(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:media:clear_confirm:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleMediaClearConfirm(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:media:clear:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleMediaClear(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:media:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleMedia(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:delete_confirm:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleDeleteConfirm(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:rex:delete:(.+)$/, adminOnly, (ctx) =>
+    handleAdminReportExampleDelete(ctx, ctx.match[1]),
+  );
+
   // ── User task callbacks ──────────────────────────────────────────────────
   bot.callbackQuery('user:menu', handleUserMenu);
   bot.callbackQuery('user:tasks', handleUserTaskList);
@@ -259,6 +312,8 @@ export function createBot(): Bot<MyContext> {
       await handleReportPhoto(ctx);
     } else if (ctx.session.taskMediaStep === 'awaiting_media') {
       await handleTaskMediaPhoto(ctx);
+    } else if (ctx.session.reportExampleMediaStep === 'awaiting_media') {
+      await handleReportExampleMediaPhoto(ctx);
     }
   });
 
@@ -267,6 +322,8 @@ export function createBot(): Bot<MyContext> {
       await handleReportVideo(ctx);
     } else if (ctx.session.taskMediaStep === 'awaiting_media') {
       await handleTaskMediaVideo(ctx);
+    } else if (ctx.session.reportExampleMediaStep === 'awaiting_media') {
+      await handleReportExampleMediaVideo(ctx);
     }
   });
 
@@ -279,6 +336,12 @@ export function createBot(): Bot<MyContext> {
     // Admin reject comment flow
     if (ctx.session.adminRejectReportId && (await isAdmin(telegramId))) {
       await handleAdminRejectCommentText(ctx, ctx.session.adminRejectReportId);
+      return;
+    }
+
+    // Admin report example comment flow
+    if (ctx.session.reportExampleCommentId && (await isAdmin(telegramId))) {
+      await handleAdminReportExampleCommentText(ctx);
       return;
     }
 

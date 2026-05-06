@@ -103,6 +103,13 @@ export const TASK_CATEGORY_LABELS: Record<string, string> = {
   install_by_key: '🔑 Установка приложения по ключу',
 };
 
+export const CATEGORY_KEY_LABELS: Record<string, string> = {
+  report_app: '📊 Репорт приложения',
+  download_app: '📥 Скачать приложение',
+  install_by_key: '🔑 Установка приложения по ключу',
+  none: '📋 Без категории',
+};
+
 export const ADMIN_NO_TASKS = '📋 Заданий пока нет.';
 export const ADMIN_TASKS_HEADER = (count: number) => `📋 <b>Все задания</b> (${count})`;
 export const ADMIN_TASK_NOT_FOUND = '❌ Задание не найдено';
@@ -278,6 +285,56 @@ export const ADMIN_REPORT_REJECTED_NOTIFY = (taskTitle: string, comment?: string
   `Задание: <b>${taskTitle}</b>\n` +
   (comment ? `Причина: ${comment}` : '<i>Причина не указана.</i>') +
   `\n\nЕсли задание ещё активно и есть свободные места — вы можете взять его повторно и отправить новый отчёт.`;
+
+// ── Admin report examples ──────────────────────────────────────────────────
+
+export const ADMIN_REX_LIST_HEADER =
+  `📝 <b>Примеры отчётов</b>\n\nВыберите тип задания для управления примером:`;
+
+export const ADMIN_REX_NO_EXAMPLE = (label: string) =>
+  `📝 <b>Пример отчёта — ${label}</b>\n\n<i>Пример не задан.</i>`;
+
+export const ADMIN_REX_DETAIL = (
+  label: string,
+  comment: string | null,
+  mediaCount: number,
+) =>
+  `📝 <b>Пример отчёта — ${label}</b>\n\n` +
+  `Комментарий: ${comment ? `<i>${comment}</i>` : '<i>не задан</i>'}\n` +
+  `Медиафайлов: <b>${mediaCount}</b>`;
+
+export const ADMIN_REX_CREATED = '✅ Пример создан.';
+
+export const ADMIN_REX_COMMENT_PROMPT = (currentComment: string | null) =>
+  `✏️ <b>Комментарий к примеру</b>\n\n` +
+  `Текущий: ${currentComment ? `<i>${currentComment}</i>` : '<i>не задан</i>'}\n\n` +
+  `Введите новый текст комментария:`;
+
+export const ADMIN_REX_COMMENT_SAVED = '✅ Комментарий сохранён.';
+
+export const ADMIN_REX_DELETE_CONFIRM = (label: string) =>
+  `🗑 <b>Удалить пример отчёта?</b>\n\n${label}\n\nМедиафайлы также будут удалены. Это действие необратимо.`;
+
+export const ADMIN_REX_DELETED = '🗑 Пример удалён.';
+
+export const ADMIN_REX_MEDIA_HEADER = (label: string, count: number) =>
+  `📎 <b>Медиа примера — ${label}</b>\n\n` +
+  (count === 0 ? `Нет файлов. Добавьте фото или видео.` : `${pluralFiles(count)} прикреплено.`);
+
+export const ADMIN_REX_MEDIA_UPLOAD_PROMPT = (label: string, max: number, count: number) =>
+  `📎 <b>Добавить медиа — ${label}</b>\n\n` +
+  `Отправьте фото или видео (до ${max} файлов, макс. 20 МБ каждый).\n\n` +
+  `Получено файлов: <b>${count}</b>`;
+
+export const ADMIN_REX_MEDIA_SAVED = '✅ Медиафайлы сохранены.';
+export const ADMIN_REX_MEDIA_CLEARED = '🗑 Медиафайлы удалены.';
+export const ADMIN_REX_MEDIA_CLEAR_CONFIRM =
+  `🗑 <b>Удалить все медиафайлы примера?</b>\n\nЭто действие необратимо.`;
+
+// ── User report example display ────────────────────────────────────────────
+
+export const USER_REPORT_EXAMPLE_HEADER = (comment: string | null) =>
+  `📋 <b>Пример отчёта:</b>` + (comment ? `\n\n${comment}` : '');
 
 // ── Admin payouts ──────────────────────────────────────────────────────────
 
@@ -555,6 +612,12 @@ export const KB = {
   BACK_REPORTS_ADMIN: '📊 К отчётам',
   BACK_ADMIN_MENU: '◀ Панель администратора',
   CANCEL_REJECT: '◀ Отмена',
+  BACK_REX: '◀ К примерам',
+  BACK_REX_DETAIL: '◀ К деталям',
+  REX_CREATE: '➕ Создать пример',
+  REX_COMMENT: '✏️ Изменить комментарий',
+  REX_DELETE: '🗑 Удалить пример',
+  REX_MEDIA: (count: number) => count > 0 ? `📎 Медиа (${count})` : '📎 Добавить медиа',
 };
 
 // ── Main / admin menu labels ───────────────────────────────────────────────
@@ -569,6 +632,7 @@ export const MENU = {
   ADMIN_TASKS: '📋 Задания',
   ADMIN_REPORTS: '📊 Отчёты',
   ADMIN_PAYOUTS: '💰 Выплаты',
+  ADMIN_REPORT_EXAMPLES: '📝 Примеры отчётов',
   ADMIN_USER_MENU: '👤 Меню пользователя',
   ADMIN_DEACTIVATE: '🔴 Деактивировать',
   ADMIN_ACTIVATE: '🟢 Активировать',

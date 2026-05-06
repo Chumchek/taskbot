@@ -53,6 +53,13 @@ export interface PendingTaskMedia {
   promptMsgId?: number;
 }
 
+export interface PendingReportExampleMedia {
+  exampleId: number;
+  categoryKey: string;
+  count: number;
+  promptMsgId?: number;
+}
+
 export interface SessionData {
   // User registration flow
   step: RegistrationStep;
@@ -72,6 +79,11 @@ export interface SessionData {
 
   // Admin report rejection flow (awaiting comment text)
   adminRejectReportId?: number;
+
+  // Admin report example management
+  reportExampleCommentId?: number;
+  reportExampleMediaStep?: 'awaiting_media';
+  pendingReportExampleMedia?: PendingReportExampleMedia;
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>;
