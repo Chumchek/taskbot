@@ -29,6 +29,7 @@ import {
 // Handlers — admin tasks
 import {
   handleAdminTaskCancelCreate,
+  handleAdminTaskCategorySelect,
   handleAdminTaskConfirmCreate,
   handleAdminTaskCreate,
   handleAdminTaskDelete,
@@ -139,6 +140,18 @@ export function createBot(): Bot<MyContext> {
   // ── Admin task callbacks ─────────────────────────────────────────────────
   bot.callbackQuery('admin:tasks', adminOnly, handleAdminTaskList);
   bot.callbackQuery('admin:task:create', adminOnly, handleAdminTaskCreate);
+  bot.callbackQuery('admin:task:category:report_app', adminOnly, (ctx) =>
+    handleAdminTaskCategorySelect(ctx, 'report_app'),
+  );
+  bot.callbackQuery('admin:task:category:download_app', adminOnly, (ctx) =>
+    handleAdminTaskCategorySelect(ctx, 'download_app'),
+  );
+  bot.callbackQuery('admin:task:category:install_by_key', adminOnly, (ctx) =>
+    handleAdminTaskCategorySelect(ctx, 'install_by_key'),
+  );
+  bot.callbackQuery('admin:task:category:none', adminOnly, (ctx) =>
+    handleAdminTaskCategorySelect(ctx, null),
+  );
   bot.callbackQuery('admin:task:skip_desc', adminOnly, handleAdminTaskSkipDesc);
   bot.callbackQuery('admin:task:skip_expiry', adminOnly, handleAdminTaskSkipExpiry);
   bot.callbackQuery('admin:task:confirm_create', adminOnly, handleAdminTaskConfirmCreate);

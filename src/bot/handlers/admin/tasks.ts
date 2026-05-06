@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
-import { adminMenuKeyboard, adminTaskListKeyboard, adminTaskDetailKeyboard } from '../../keyboards';
+import { adminMenuKeyboard, adminTaskListKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard } from '../../keyboards';
 import {
   createTask,
   deleteTask,
@@ -14,6 +14,7 @@ import { isValidUrl, isValidPrice, isValidSlots, isValidDeadlineHours } from '..
 import {
   deadlineLabel,
   KB,
+  TASK_CATEGORY_LABELS,
   ADMIN_NO_TASKS,
   ADMIN_TASKS_HEADER,
   ADMIN_TASK_NOT_FOUND,
@@ -25,6 +26,10 @@ import {
   ADMIN_TASK_DELETE_CONFIRM,
   ADMIN_TASK_DELETED,
   ADMIN_TASK_HAS_ACTIVE_ASSIGNMENTS,
+  ADMIN_TASK_CREATE_CATEGORY_STEP,
+  ADMIN_TASK_PACKAGE_NAME_STEP,
+  ADMIN_TASK_PACKAGE_NAME_SAVED,
+  ADMIN_TASK_PACKAGE_NAME_TOO_LONG,
   ADMIN_TASK_CREATE_STEP1,
   ADMIN_TASK_CREATE_STEP3,
   ADMIN_TASK_TITLE_SAVED,
@@ -93,9 +98,11 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
   const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
   const dl = deadlineLabel(task.deadlineHours);
   const expiresAt = taskExpiresAtLabel(task);
+  const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   const text = ADMIN_TASK_DETAIL(
     task.title, task.description, task.link, task.priceUah,
     task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
+    categoryLabel, task.packageName ?? null,
   );
 
   await ctx.editMessageText(text, {
@@ -123,9 +130,11 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
   const status = task.isActive ? ADMIN_TASK_ACTIVE_STATUS : ADMIN_TASK_INACTIVE_STATUS;
   const dl = deadlineLabel(task.deadlineHours);
   const expiresAt = taskExpiresAtLabel(task);
+  const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   const text = ADMIN_TASK_DETAIL(
     task.title, task.description, task.link, task.priceUah,
     task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
+    categoryLabel, task.packageName ?? null,
   );
 
   await ctx.editMessageText(text, {
@@ -191,13 +200,36 @@ export async function handleAdminTaskDelete(ctx: MyContext, taskId: number): Pro
 
 export async function handleAdminTaskCreate(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
-  ctx.session.taskStep = 'awaiting_title';
+  ctx.session.taskStep = 'awaiting_category';
   ctx.session.pendingTask = {};
 
-  await ctx.editMessageText(ADMIN_TASK_CREATE_STEP1, {
+  await ctx.editMessageText(ADMIN_TASK_CREATE_CATEGORY_STEP, {
     parse_mode: 'HTML',
-    reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    reply_markup: adminTaskCategoryKeyboard(),
   });
+}
+
+export async function handleAdminTaskCategorySelect(
+  ctx: MyContext,
+  category: 'report_app' | 'download_app' | 'install_by_key' | null,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+  ctx.session.pendingTask = { ...ctx.session.pendingTask, category };
+
+  const needsPackage = category === 'report_app' || category === 'download_app';
+  if (needsPackage) {
+    ctx.session.taskStep = 'awaiting_package_name';
+    await ctx.editMessageText(ADMIN_TASK_PACKAGE_NAME_STEP, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
+  } else {
+    ctx.session.taskStep = 'awaiting_title';
+    await ctx.editMessageText(ADMIN_TASK_CREATE_STEP1, {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
+  }
 }
 
 export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
@@ -205,6 +237,21 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
   if (!text) return;
 
   const { taskStep, pendingTask = {} } = ctx.session;
+
+  if (taskStep === 'awaiting_package_name') {
+    if (text.length > 200) {
+      await ctx.reply(ADMIN_TASK_PACKAGE_NAME_TOO_LONG);
+      return;
+    }
+    ctx.session.pendingTask = { ...pendingTask, packageName: text };
+    ctx.session.taskStep = 'awaiting_title';
+
+    await ctx.reply(ADMIN_TASK_PACKAGE_NAME_SAVED(text), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.CANCEL, 'admin:task:cancel_create'),
+    });
+    return;
+  }
 
   if (taskStep === 'awaiting_title') {
     if (text.length > 100) {
@@ -315,10 +362,12 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     ctx.session.pendingTask = task;
     ctx.session.taskStep = 'confirming';
 
+    const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
     await ctx.reply(
       ADMIN_TASK_SUMMARY(
         task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
         deadlineLabel(task.deadlineHours!), deadlineLabel(hours),
+        categoryLabel, task.packageName ?? null,
       ),
       {
         parse_mode: 'HTML',
@@ -349,10 +398,12 @@ export async function handleAdminTaskSkipExpiry(ctx: MyContext): Promise<void> {
   ctx.session.pendingTask = task;
   ctx.session.taskStep = 'confirming';
 
+  const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   await ctx.editMessageText(
     ADMIN_TASK_SUMMARY(
       task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
       deadlineLabel(task.deadlineHours!), null,
+      categoryLabel, task.packageName ?? null,
     ),
     {
       parse_mode: 'HTML',
@@ -393,6 +444,8 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
     slotsTotal: pendingTask.slotsTotal,
     deadlineHours: pendingTask.deadlineHours,
     taskExpiryHours: pendingTask.taskExpiryHours ?? null,
+    category: pendingTask.category ?? null,
+    packageName: pendingTask.packageName ?? null,
     createdBy: adminUser?.id ?? null,
   });
 

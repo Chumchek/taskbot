@@ -14,6 +14,8 @@ export interface CreateTaskInput {
   slotsTotal: number;
   deadlineHours: number;
   taskExpiryHours?: number | null;
+  category?: 'report_app' | 'download_app' | 'install_by_key' | null;
+  packageName?: string | null;
   createdBy?: number | null;
 }
 

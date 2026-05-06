@@ -97,6 +97,12 @@ export const ADMIN_PROMOTED = (name: string) => `👑 <b>${name}</b> тепер�
 
 // ── Admin tasks ────────────────────────────────────────────────────────────
 
+export const TASK_CATEGORY_LABELS: Record<string, string> = {
+  report_app: '📊 Репорт приложения',
+  download_app: '📥 Скачать приложение',
+  install_by_key: '🔑 Установка приложения по ключу',
+};
+
 export const ADMIN_NO_TASKS = '📋 Заданий пока нет.';
 export const ADMIN_TASKS_HEADER = (count: number) => `📋 <b>Все задания</b> (${count})`;
 export const ADMIN_TASK_NOT_FOUND = '❌ Задание не найдено';
@@ -115,8 +121,12 @@ export const ADMIN_TASK_DETAIL = (
   dl: string,
   status: string,
   expiresAt?: string | null,
+  categoryLabel?: string | null,
+  packageName?: string | null,
 ) =>
   `<b>${title}</b>\n\n` +
+  (categoryLabel ? `📂 Категория: <b>${categoryLabel}</b>\n` : '') +
+  (packageName ? `📦 Пакет: <b>${packageName}</b>\n` : '') +
   (description ? `📝 ${description}\n\n` : '') +
   `🔗 <a href="${link}">Ссылка на задание</a>\n` +
   `💰 Оплата: <b>${priceUah} грн</b>\n` +
@@ -132,6 +142,21 @@ export const ADMIN_TASK_HAS_ACTIVE_ASSIGNMENTS = (count: number) =>
   `❌ ${count} пользователь(ей) активно работает над этим заданием. Деактивируйте его и дождитесь завершения (до 24 ч.).`;
 
 // Task creation
+export const ADMIN_TASK_CREATE_CATEGORY_STEP =
+  `➕ <b>Новое задание</b>\n\nВыберите <b>категорию</b> задания:`;
+
+export const ADMIN_TASK_PACKAGE_NAME_STEP =
+  `✅ Категория выбрана.\n\n` +
+  `Введите <b>название пакета (bundle ID)</b> приложения:\n` +
+  `<i>Например: com.example.app</i>`;
+
+export const ADMIN_TASK_PACKAGE_NAME_SAVED = (pkg: string) =>
+  `✅ Пакет: <b>${pkg}</b>\n\n` +
+  `<b>Шаг 1/7:</b> Введите <b>название</b> задания:\n<i>(не более 100 символов)</i>`;
+
+export const ADMIN_TASK_PACKAGE_NAME_TOO_LONG =
+  '❌ Название пакета слишком длинное (макс. 200 символов). Попробуйте ещё раз:';
+
 export const ADMIN_TASK_CREATE_STEP1 =
   `➕ <b>Новое задание — Шаг 1/7</b>\n\nВведите <b>название</b> задания:\n<i>(не более 100 символов)</i>`;
 
@@ -177,8 +202,12 @@ export const ADMIN_TASK_SUMMARY = (
   slotsTotal: number,
   dl: string,
   expiryLabel?: string | null,
+  categoryLabel?: string | null,
+  packageName?: string | null,
 ) =>
   `📋 <b>Итог задания</b>\n\n` +
+  (categoryLabel ? `Категория: <b>${categoryLabel}</b>\n` : '') +
+  (packageName ? `Пакет: <b>${packageName}</b>\n` : '') +
   `Название: <b>${title}</b>\n` +
   (description ? `Описание: ${description}\n` : '') +
   `Ссылка: <a href="${link}">${link}</a>\n` +
@@ -205,9 +234,11 @@ export const ADMIN_REPORT_DETAIL = (
   priceUah: string,
   submittedAt: string,
   fileCount: number,
+  packageName?: string | null,
 ) =>
   `📊 <b>Отчёт #${reportId}</b>\n\n` +
   `Задание: <b>${taskTitle}</b>\n` +
+  (packageName ? `Пакет: <b>${packageName}</b>\n` : '') +
   `Пользователь: ${userName}\n` +
   `Вознаграждение: <b>${priceUah} грн</b>\n` +
   `Отправлен: ${submittedAt}\n` +

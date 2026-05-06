@@ -2,7 +2,11 @@ import { Context, SessionFlavor } from 'grammy';
 
 export type RegistrationStep = 'idle' | 'awaiting_binance' | 'awaiting_card';
 
+export type TaskCategory = 'report_app' | 'download_app' | 'install_by_key';
+
 export type TaskCreationStep =
+  | 'awaiting_category'
+  | 'awaiting_package_name'
   | 'awaiting_title'
   | 'awaiting_description'
   | 'awaiting_link'
@@ -15,6 +19,8 @@ export type TaskCreationStep =
 export type ReportStep = 'awaiting_media';
 
 export interface PendingTask {
+  category?: TaskCategory | null;
+  packageName?: string;
   title?: string;
   description?: string;
   link?: string;

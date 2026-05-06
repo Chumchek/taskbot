@@ -76,6 +76,19 @@ export function adminTaskDetailKeyboard(taskId: number, isActive: boolean, media
     .text(MENU.BACK_TO_TASKS_ADMIN, 'admin:tasks');
 }
 
+export function adminTaskCategoryKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('📊 Репорт приложения', 'admin:task:category:report_app')
+    .row()
+    .text('📥 Скачать приложение', 'admin:task:category:download_app')
+    .row()
+    .text('🔑 Установка приложения по ключу', 'admin:task:category:install_by_key')
+    .row()
+    .text('📋 Без категории', 'admin:task:category:none')
+    .row()
+    .text(KB.CANCEL, 'admin:task:cancel_create');
+}
+
 // ── Registration keyboards ─────────────────────────────────────────────────
 
 export function registrationStep1Keyboard(): InlineKeyboard {

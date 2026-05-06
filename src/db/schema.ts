@@ -14,6 +14,7 @@ import {
 export const userStatusEnum = pgEnum('user_status', ['pending', 'approved', 'rejected', 'banned']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['claimed', 'completed', 'expired']);
 export const reportStatusEnum = pgEnum('report_status', ['pending', 'approved', 'rejected']);
+export const taskCategoryEnum = pgEnum('task_category', ['report_app', 'download_app', 'install_by_key']);
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -39,6 +40,8 @@ export const tasks = pgTable('tasks', {
   deadlineHours: integer('deadline_hours').notNull().default(24),
   taskExpiryHours: integer('task_expiry_hours'),
   isActive: boolean('is_active').notNull().default(true),
+  category: taskCategoryEnum('category'),
+  packageName: text('package_name'),
   createdBy: integer('created_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

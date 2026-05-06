@@ -75,6 +75,7 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
       item.priceUah,
       submittedAt,
       item.mediaFiles.length,
+      item.packageName,
     ),
     {
       parse_mode: 'HTML',

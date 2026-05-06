@@ -11,6 +11,7 @@ export interface ReportWithContext {
   userTelegramId: string;
   taskTitle: string;
   priceUah: string;
+  packageName: string | null;
   mediaFiles: Media[];
 }
 
@@ -42,7 +43,7 @@ export async function getPendingReports(): Promise<ReportWithContext[]> {
     .select({
       report: reports,
       user: { telegramId: users.telegramId, username: users.username, firstName: users.firstName },
-      task: { title: tasks.title, priceUah: tasks.priceUah },
+      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName },
     })
     .from(reports)
     .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
@@ -63,6 +64,7 @@ export async function getPendingReports(): Promise<ReportWithContext[]> {
       userTelegramId: row.user.telegramId,
       taskTitle: row.task.title,
       priceUah: row.task.priceUah,
+      packageName: row.task.packageName ?? null,
       mediaFiles,
     });
   }
@@ -75,7 +77,7 @@ export async function getReportWithContext(reportId: number): Promise<ReportWith
     .select({
       report: reports,
       user: { telegramId: users.telegramId, username: users.username, firstName: users.firstName },
-      task: { title: tasks.title, priceUah: tasks.priceUah },
+      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName },
     })
     .from(reports)
     .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
@@ -93,6 +95,7 @@ export async function getReportWithContext(reportId: number): Promise<ReportWith
     userTelegramId: row.user.telegramId,
     taskTitle: row.task.title,
     priceUah: row.task.priceUah,
+    packageName: row.task.packageName ?? null,
     mediaFiles,
   };
 }
