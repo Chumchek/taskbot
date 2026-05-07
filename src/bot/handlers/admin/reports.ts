@@ -177,7 +177,11 @@ export async function handleAdminReportReject(
   const result = await rejectReport(reportId, adminUser?.id ?? 0, comment);
 
   if (!result) {
-    await ctx.answerCallbackQuery({ text: ADMIN_REPORT_ALREADY_REVIEWED, show_alert: true });
+    if (ctx.callbackQuery) {
+      await ctx.answerCallbackQuery({ text: ADMIN_REPORT_ALREADY_REVIEWED, show_alert: true });
+    } else {
+      await ctx.reply(ADMIN_REPORT_ALREADY_REVIEWED);
+    }
     return;
   }
 

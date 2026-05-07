@@ -333,6 +333,19 @@ export function createBot(): Bot<MyContext> {
 
     const telegramId = ctx.from?.id.toString() ?? '';
 
+    // User registration flow
+    if (ctx.session.step !== 'idle') {
+      await handleRegistrationText(ctx);
+      return;
+    }
+
+    // Admin task creation flow (checked before other admin flows to prevent
+    // stale session state from hijacking text input mid-creation)
+    if (ctx.session.taskStep && (await isAdmin(telegramId))) {
+      await handleTaskCreationText(ctx);
+      return;
+    }
+
     // Admin reject comment flow
     if (ctx.session.adminRejectReportId && (await isAdmin(telegramId))) {
       await handleAdminRejectCommentText(ctx, ctx.session.adminRejectReportId);
@@ -342,18 +355,6 @@ export function createBot(): Bot<MyContext> {
     // Admin report example comment flow
     if (ctx.session.reportExampleCommentId && (await isAdmin(telegramId))) {
       await handleAdminReportExampleCommentText(ctx);
-      return;
-    }
-
-    // User registration flow
-    if (ctx.session.step !== 'idle') {
-      await handleRegistrationText(ctx);
-      return;
-    }
-
-    // Admin task creation flow
-    if (ctx.session.taskStep && (await isAdmin(telegramId))) {
-      await handleTaskCreationText(ctx);
       return;
     }
   });

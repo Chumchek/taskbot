@@ -202,6 +202,8 @@ export async function handleAdminTaskCreate(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
   ctx.session.taskStep = 'awaiting_category';
   ctx.session.pendingTask = {};
+  ctx.session.adminRejectReportId = undefined;
+  ctx.session.reportExampleCommentId = undefined;
 
   await ctx.editMessageText(ADMIN_TASK_CREATE_CATEGORY_STEP, {
     parse_mode: 'HTML',
