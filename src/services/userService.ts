@@ -99,6 +99,14 @@ export async function deleteAdminNotifications(targetTelegramId: string): Promis
   await db.delete(adminNotifications).where(eq(adminNotifications.targetTelegramId, targetTelegramId));
 }
 
+export async function updateUserBinanceId(telegramId: string, binanceId: string): Promise<void> {
+  await db.update(users).set({ binanceId }).where(eq(users.telegramId, telegramId));
+}
+
+export async function updateUserCard(telegramId: string, cardEncrypted: string): Promise<void> {
+  await db.update(users).set({ cardEncrypted }).where(eq(users.telegramId, telegramId));
+}
+
 // Returns true if telegramId is an env-based super-admin OR has is_admin flag in DB.
 export async function isAdmin(telegramId: string): Promise<boolean> {
   if (config.admins.includes(telegramId)) return true;

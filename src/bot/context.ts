@@ -84,6 +84,12 @@ export interface SessionData {
   reportExampleCommentId?: number;
   reportExampleMediaStep?: 'awaiting_media';
   pendingReportExampleMedia?: PendingReportExampleMedia;
+
+  // User profile payment update flow
+  paymentEditStep?: 'awaiting_binance_update' | 'awaiting_card_update';
+
+  // Admin task search flow
+  adminTaskSearchStep?: 'awaiting_package_search';
 }
 
 export type MyContext = Context & SessionFlavor<SessionData>;

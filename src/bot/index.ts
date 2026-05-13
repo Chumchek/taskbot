@@ -35,6 +35,8 @@ import {
   handleAdminTaskDelete,
   handleAdminTaskDeleteConfirm,
   handleAdminTaskList,
+  handleAdminTaskSearch,
+  handleAdminTaskSearchText,
   handleAdminTaskSkipDesc,
   handleAdminTaskSkipExpiry,
   handleAdminTaskToggle,
@@ -117,6 +119,14 @@ import {
 // Handlers — user balance
 import { handleUserBalance } from './handlers/user/balance';
 
+// Handlers — user profile
+import {
+  handleUserProfile,
+  handleUserProfileEditBinance,
+  handleUserProfileEditCard,
+  handleProfileUpdateText,
+} from './handlers/user/profile';
+
 export function createBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(config.bot.token);
 
@@ -188,6 +198,7 @@ export function createBot(): Bot<MyContext> {
   bot.callbackQuery(/^admin:task:delete:(\d+)$/, adminOnly, (ctx) =>
     handleAdminTaskDelete(ctx, parseInt(ctx.match[1], 10)),
   );
+  bot.callbackQuery('admin:task:search', adminOnly, handleAdminTaskSearch);
 
   // ── Admin report callbacks ───────────────────────────────────────────────
   bot.callbackQuery('admin:reports', adminOnly, handleAdminReportList);
@@ -306,6 +317,11 @@ export function createBot(): Bot<MyContext> {
   // ── User balance ─────────────────────────────────────────────────────────
   bot.callbackQuery('user:balance', handleUserBalance);
 
+  // ── User profile ─────────────────────────────────────────────────────────
+  bot.callbackQuery('user:profile', handleUserProfile);
+  bot.callbackQuery('user:profile:edit_binance', handleUserProfileEditBinance);
+  bot.callbackQuery('user:profile:edit_card', handleUserProfileEditCard);
+
   // ── Media handlers ────────────────────────────────────────────────────────
   bot.on('message:photo', async (ctx) => {
     if (ctx.session.reportStep === 'awaiting_media') {
@@ -339,10 +355,22 @@ export function createBot(): Bot<MyContext> {
       return;
     }
 
+    // User profile payment update flow
+    if (ctx.session.paymentEditStep) {
+      await handleProfileUpdateText(ctx);
+      return;
+    }
+
     // Admin task creation flow (checked before other admin flows to prevent
     // stale session state from hijacking text input mid-creation)
     if (ctx.session.taskStep && (await isAdmin(telegramId))) {
       await handleTaskCreationText(ctx);
+      return;
+    }
+
+    // Admin task search flow
+    if (ctx.session.adminTaskSearchStep && (await isAdmin(telegramId))) {
+      await handleAdminTaskSearchText(ctx);
       return;
     }
 

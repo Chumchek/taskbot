@@ -11,7 +11,9 @@ export function mainMenuKeyboard(): InlineKeyboard {
     .text(MENU.MY_TASKS, 'user:my_tasks')
     .row()
     .text(MENU.MY_REPORTS, 'user:reports')
-    .text(MENU.MY_BALANCE, 'user:balance');
+    .text(MENU.MY_BALANCE, 'user:balance')
+    .row()
+    .text(MENU.MY_PROFILE, 'user:profile');
 }
 
 export function userTaskListKeyboard(tasks: Task[], claimedIds: Set<number>): InlineKeyboard {
@@ -65,7 +67,21 @@ export function adminTaskListKeyboard(tasks: Task[]): InlineKeyboard {
     const icon = task.isActive ? '🟢' : '🔴';
     kb.text(`${icon} ${task.title}`, `admin:task:view:${task.id}`).row();
   }
-  kb.text(KB.CREATE_TASK, 'admin:task:create').row().text(KB.BACK, 'admin:menu');
+  kb.text(KB.CREATE_TASK, 'admin:task:create')
+    .row()
+    .text(KB.SEARCH_TASKS, 'admin:task:search')
+    .row()
+    .text(KB.BACK, 'admin:menu');
+  return kb;
+}
+
+export function adminTaskSearchResultsKeyboard(tasks: Task[]): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const task of tasks) {
+    const icon = task.isActive ? '🟢' : '🔴';
+    kb.text(`${icon} ${task.title}`, `admin:task:view:${task.id}`).row();
+  }
+  kb.text(KB.VIEW_ALL_TASKS, 'admin:tasks');
   return kb;
 }
 
@@ -139,6 +155,15 @@ export function adminTaskCategoryKeyboard(): InlineKeyboard {
     .text('📋 Без категории', 'admin:task:category:none')
     .row()
     .text(KB.CANCEL, 'admin:task:cancel_create');
+}
+
+export function userProfileKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(KB.EDIT_BINANCE, 'user:profile:edit_binance')
+    .row()
+    .text(KB.EDIT_CARD, 'user:profile:edit_card')
+    .row()
+    .text(KB.BACK, 'user:menu');
 }
 
 // ── Registration keyboards ─────────────────────────────────────────────────

@@ -559,6 +559,44 @@ export const USER_REPORT_ADMIN_COMMENT = (comment: string) =>
 export const USER_REPORT_APPROVED_HINT = (threshold: number) =>
   `\n\n✅ <i>Оплата будет произведена, когда ваш баланс достигнет ${threshold} грн.</i>`;
 
+// ── User profile ───────────────────────────────────────────────────────────
+
+export const USER_PROFILE_HEADER = (binanceId: string | null, maskedCard: string | null) =>
+  `👤 <b>Мой профиль</b>\n\n` +
+  `<b>Способы оплаты:</b>\n` +
+  `Binance ID: ${binanceId ? `<code>${binanceId}</code>` : '<i>не указан</i>'}\n` +
+  `Карта: ${maskedCard ? `<code>${maskedCard}</code>` : '<i>не указана</i>'}`;
+
+export const USER_PROFILE_BINANCE_PROMPT =
+  `✏️ <b>Изменить Binance Pay ID</b>\n\n` +
+  `Введите новый <b>Binance Pay ID</b>:\n` +
+  `<i>(9-значное число из Binance → Pay → Получить)</i>`;
+
+export const USER_PROFILE_CARD_PROMPT =
+  `✏️ <b>Изменить номер карты</b>\n\n` +
+  `Введите новый <b>номер карты</b> (16 цифр):\n` +
+  `<i>(пробелы допускаются, напр. 1234 5678 9012 3456)</i>`;
+
+export const USER_PROFILE_BINANCE_SAVED = (binanceId: string) =>
+  `✅ <b>Binance ID обновлён</b>\n\nНовый ID: <code>${binanceId}</code>`;
+
+export const USER_PROFILE_CARD_SAVED = (maskedCard: string) =>
+  `✅ <b>Номер карты обновлён</b>\n\nКарта: <code>${maskedCard}</code>`;
+
+export const USER_PROFILE_INVALID_CARD =
+  '❌ Неверный номер карты. Введите ровно 16 цифр (пробелы допускаются):';
+
+// ── Admin task search ───────────────────────────────────────────────────────
+
+export const ADMIN_TASK_SEARCH_PROMPT =
+  `🔍 <b>Поиск по пакету</b>\n\nВведите название пакета (bundle ID) или его часть:`;
+
+export const ADMIN_TASK_SEARCH_RESULTS = (query: string, count: number) =>
+  `🔍 <b>Результаты поиска</b>\n\nПакет: <code>${query}</code>\nНайдено: <b>${count}</b>`;
+
+export const ADMIN_TASK_SEARCH_NO_RESULTS = (query: string) =>
+  `🔍 <b>Результаты поиска</b>\n\nПакет: <code>${query}</code>\n\n<i>Заданий с таким пакетом не найдено.</i>`;
+
 // ── User balance ───────────────────────────────────────────────────────────
 
 export const USER_BALANCE_HEADER = (balance: string) =>
@@ -618,6 +656,9 @@ export const KB = {
   REX_COMMENT: '✏️ Изменить комментарий',
   REX_DELETE: '🗑 Удалить пример',
   REX_MEDIA: (count: number) => count > 0 ? `📎 Медиа (${count})` : '📎 Добавить медиа',
+  EDIT_BINANCE: '✏️ Изменить Binance ID',
+  EDIT_CARD: '✏️ Изменить карту',
+  SEARCH_TASKS: '🔍 Найти по пакету',
 };
 
 // ── Main / admin menu labels ───────────────────────────────────────────────
@@ -633,6 +674,7 @@ export const MENU = {
   ADMIN_REPORTS: '📊 Отчёты',
   ADMIN_PAYOUTS: '💰 Выплаты',
   ADMIN_REPORT_EXAMPLES: '📝 Примеры отчётов',
+  MY_PROFILE: '👤 Профиль',
   ADMIN_USER_MENU: '👤 Меню пользователя',
   ADMIN_DEACTIVATE: '🔴 Деактивировать',
   ADMIN_ACTIVATE: '🟢 Активировать',

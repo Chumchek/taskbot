@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gt, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { assignments, media, reports, taskMedia, tasks } from '../db/schema';
 import { deleteFile } from './storageService';
@@ -107,6 +107,14 @@ export async function deleteTask(taskId: number): Promise<DeleteTaskResult> {
   });
 
   return { success: true };
+}
+
+export async function getTasksByPackageName(packageName: string): Promise<Task[]> {
+  return db
+    .select()
+    .from(tasks)
+    .where(ilike(tasks.packageName, `%${packageName}%`))
+    .orderBy(tasks.id);
 }
 
 // Returns task IDs the user has already claimed or completed.

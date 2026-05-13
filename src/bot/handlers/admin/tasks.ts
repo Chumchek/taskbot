@@ -1,11 +1,12 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
-import { adminMenuKeyboard, adminTaskListKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard } from '../../keyboards';
+import { adminMenuKeyboard, adminTaskListKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard, adminTaskSearchResultsKeyboard } from '../../keyboards';
 import {
   createTask,
   deleteTask,
   getAllTasks,
   getTaskById,
+  getTasksByPackageName,
   toggleTaskActive,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
@@ -51,6 +52,9 @@ import {
   ADMIN_TASK_CREATED,
   ADMIN_PANEL_HEADER,
   ADMIN_TASK_CREATION_CANCELLED,
+  ADMIN_TASK_SEARCH_PROMPT,
+  ADMIN_TASK_SEARCH_RESULTS,
+  ADMIN_TASK_SEARCH_NO_RESULTS,
 } from '../../../i18n/ru';
 
 function taskExpiresAtLabel(task: { createdAt: Date; taskExpiryHours: number | null }): string | null {
@@ -204,6 +208,7 @@ export async function handleAdminTaskCreate(ctx: MyContext): Promise<void> {
   ctx.session.pendingTask = {};
   ctx.session.adminRejectReportId = undefined;
   ctx.session.reportExampleCommentId = undefined;
+  ctx.session.adminTaskSearchStep = undefined;
 
   await ctx.editMessageText(ADMIN_TASK_CREATE_CATEGORY_STEP, {
     parse_mode: 'HTML',
@@ -471,5 +476,41 @@ export async function handleAdminTaskCancelCreate(ctx: MyContext): Promise<void>
   await ctx.editMessageText(ADMIN_TASK_CREATION_CANCELLED, {
     parse_mode: 'HTML',
     reply_markup: adminMenuKeyboard(),
+  });
+}
+
+// ── Task search by package name ─────────────────────────────────────────────
+
+export async function handleAdminTaskSearch(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  ctx.session.adminTaskSearchStep = 'awaiting_package_search';
+  ctx.session.taskStep = undefined;
+  ctx.session.pendingTask = undefined;
+
+  await ctx.editMessageText(ADMIN_TASK_SEARCH_PROMPT, {
+    parse_mode: 'HTML',
+    reply_markup: new InlineKeyboard().text(KB.BACK, 'admin:tasks'),
+  });
+}
+
+export async function handleAdminTaskSearchText(ctx: MyContext): Promise<void> {
+  const query = ctx.message?.text?.trim();
+  if (!query) return;
+
+  ctx.session.adminTaskSearchStep = undefined;
+
+  const results = await getTasksByPackageName(query);
+
+  if (results.length === 0) {
+    await ctx.reply(ADMIN_TASK_SEARCH_NO_RESULTS(query), {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard().text(KB.VIEW_ALL_TASKS, 'admin:tasks'),
+    });
+    return;
+  }
+
+  await ctx.reply(ADMIN_TASK_SEARCH_RESULTS(query, results.length), {
+    parse_mode: 'HTML',
+    reply_markup: adminTaskSearchResultsKeyboard(results),
   });
 }
