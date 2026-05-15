@@ -1,4 +1,4 @@
-import { and, eq, gt, ilike, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gt, ilike, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { assignments, media, reports, taskMedia, tasks } from '../db/schema';
 import { deleteFile } from './storageService';
@@ -107,6 +107,21 @@ export async function deleteTask(taskId: number): Promise<DeleteTaskResult> {
   });
 
   return { success: true };
+}
+
+export type TaskCategoryFilter = 'all' | 'report_app' | 'download_app' | 'install_by_key' | 'none';
+
+export async function getActiveTasksByFilter(category: TaskCategoryFilter): Promise<Task[]> {
+  const activeBase = and(eq(tasks.isActive, true), gt(tasks.slotsAvailable, 0));
+  if (category === 'all') return db.select().from(tasks).where(activeBase);
+  if (category === 'none') return db.select().from(tasks).where(and(activeBase, isNull(tasks.category)));
+  return db.select().from(tasks).where(and(activeBase, eq(tasks.category, category)));
+}
+
+export async function getAllTasksByFilter(category: TaskCategoryFilter): Promise<Task[]> {
+  if (category === 'all') return getAllTasks();
+  if (category === 'none') return db.select().from(tasks).where(isNull(tasks.category)).orderBy(tasks.id);
+  return db.select().from(tasks).where(eq(tasks.category, category)).orderBy(tasks.id);
 }
 
 export async function getTasksByPackageName(packageName: string): Promise<Task[]> {

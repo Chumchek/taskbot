@@ -35,6 +35,7 @@ import {
   handleAdminTaskDelete,
   handleAdminTaskDeleteConfirm,
   handleAdminTaskList,
+  handleAdminTaskPageCallback,
   handleAdminTaskSearch,
   handleAdminTaskSearchText,
   handleAdminTaskSkipDesc,
@@ -43,6 +44,7 @@ import {
   handleAdminTaskView,
   handleTaskCreationText,
 } from './handlers/admin/tasks';
+import { TaskCategoryFilter } from '../services/taskService';
 
 // Handlers — admin reports
 import {
@@ -58,6 +60,8 @@ import {
 import {
   handleAdminPayoutConfirm,
   handleAdminPayoutMarkPaid,
+  handleAdminPayoutProofPhoto,
+  handleAdminPayoutProofSkip,
   handleAdminPayoutQueue,
   handleAdminPayoutShowCard,
   handleAdminPayoutView,
@@ -100,6 +104,7 @@ import {
   handleUserMyTasks,
   handleUserTaskClaim,
   handleUserTaskList,
+  handleUserTaskPageCallback,
   handleUserTaskView,
   handleUserAssignmentView,
   handleUserTaskHelp,
@@ -118,6 +123,20 @@ import {
 
 // Handlers — user balance
 import { handleUserBalance } from './handlers/user/balance';
+
+// Handlers — user payment proofs gallery
+import { handleUserProofGallery } from './handlers/user/proofs';
+
+// Handlers — admin payment proofs
+import {
+  handleAdminProofList,
+  handleAdminProofUpload,
+  handleAdminProofPhoto,
+  handleAdminProofDone,
+  handleAdminProofPreview,
+  handleAdminProofClearConfirm,
+  handleAdminProofClear,
+} from './handlers/admin/paymentProofs';
 
 // Handlers — user profile
 import {
@@ -168,6 +187,10 @@ export function createBot(): Bot<MyContext> {
 
   // ── Admin task callbacks ─────────────────────────────────────────────────
   bot.callbackQuery('admin:tasks', adminOnly, handleAdminTaskList);
+  bot.callbackQuery(/^admin:tasks:page:([^:]+):(\d+)$/, adminOnly, (ctx) =>
+    handleAdminTaskPageCallback(ctx, ctx.match[1] as TaskCategoryFilter, parseInt(ctx.match[2], 10)),
+  );
+  bot.callbackQuery('admin:tasks:noop', adminOnly, (ctx) => ctx.answerCallbackQuery());
   bot.callbackQuery('admin:task:create', adminOnly, handleAdminTaskCreate);
   bot.callbackQuery('admin:task:category:report_app', adminOnly, (ctx) =>
     handleAdminTaskCategorySelect(ctx, 'report_app'),
@@ -228,6 +251,9 @@ export function createBot(): Bot<MyContext> {
   bot.callbackQuery(/^admin:payout:mark_paid:(\d+)$/, adminOnly, (ctx) =>
     handleAdminPayoutMarkPaid(ctx, parseInt(ctx.match[1], 10)),
   );
+  bot.callbackQuery(/^admin:payout:proof_skip:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminPayoutProofSkip(ctx, parseInt(ctx.match[1], 10)),
+  );
   bot.callbackQuery(/^admin:payout:show_card:(\d+)$/, adminOnly, (ctx) =>
     handleAdminPayoutShowCard(ctx, parseInt(ctx.match[1], 10)),
   );
@@ -287,6 +313,10 @@ export function createBot(): Bot<MyContext> {
   // ── User task callbacks ──────────────────────────────────────────────────
   bot.callbackQuery('user:menu', handleUserMenu);
   bot.callbackQuery('user:tasks', handleUserTaskList);
+  bot.callbackQuery(/^user:tasks:page:([^:]+):(\d+)$/, (ctx) =>
+    handleUserTaskPageCallback(ctx, ctx.match[1] as TaskCategoryFilter, parseInt(ctx.match[2], 10)),
+  );
+  bot.callbackQuery('user:tasks:noop', (ctx) => ctx.answerCallbackQuery());
   bot.callbackQuery('user:my_tasks', handleUserMyTasks);
 
   bot.callbackQuery(/^user:task:view:(\d+)$/, (ctx) =>
@@ -317,6 +347,17 @@ export function createBot(): Bot<MyContext> {
   // ── User balance ─────────────────────────────────────────────────────────
   bot.callbackQuery('user:balance', handleUserBalance);
 
+  // ── User proofs gallery ──────────────────────────────────────────────────
+  bot.callbackQuery('user:proofs', handleUserProofGallery);
+
+  // ── Admin payment proofs ─────────────────────────────────────────────────
+  bot.callbackQuery('admin:proofs', adminOnly, handleAdminProofList);
+  bot.callbackQuery('admin:proofs:upload', adminOnly, handleAdminProofUpload);
+  bot.callbackQuery('admin:proofs:done', adminOnly, handleAdminProofDone);
+  bot.callbackQuery('admin:proofs:preview', adminOnly, handleAdminProofPreview);
+  bot.callbackQuery('admin:proofs:clear_confirm', adminOnly, handleAdminProofClearConfirm);
+  bot.callbackQuery('admin:proofs:clear', adminOnly, handleAdminProofClear);
+
   // ── User profile ─────────────────────────────────────────────────────────
   bot.callbackQuery('user:profile', handleUserProfile);
   bot.callbackQuery('user:profile:edit_binance', handleUserProfileEditBinance);
@@ -330,6 +371,10 @@ export function createBot(): Bot<MyContext> {
       await handleTaskMediaPhoto(ctx);
     } else if (ctx.session.reportExampleMediaStep === 'awaiting_media') {
       await handleReportExampleMediaPhoto(ctx);
+    } else if (ctx.session.pendingPayoutUserId) {
+      await handleAdminPayoutProofPhoto(ctx);
+    } else if (ctx.session.adminProofUploadStep === 'awaiting_proof_photo') {
+      await handleAdminProofPhoto(ctx);
     }
   });
 

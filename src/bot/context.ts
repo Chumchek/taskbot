@@ -88,6 +88,13 @@ export interface SessionData {
   // User profile payment update flow
   paymentEditStep?: 'awaiting_binance_update' | 'awaiting_card_update';
 
+  // Admin payout proof upload flow
+  pendingPayoutUserId?: number;
+
+  // Admin payment proofs gallery upload
+  adminProofUploadStep?: 'awaiting_proof_photo';
+  pendingProofCount?: number;
+
   // Admin task search flow
   adminTaskSearchStep?: 'awaiting_package_search';
 }

@@ -1,13 +1,14 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
-import { adminMenuKeyboard, adminTaskListKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard, adminTaskSearchResultsKeyboard } from '../../keyboards';
+import { adminMenuKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard, adminTaskSearchResultsKeyboard } from '../../keyboards';
 import {
   createTask,
   deleteTask,
-  getAllTasks,
+  getAllTasksByFilter,
   getTaskById,
   getTasksByPackageName,
   toggleTaskActive,
+  TaskCategoryFilter,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
 import { getTaskMedia } from '../../../services/taskMediaService';
@@ -55,6 +56,8 @@ import {
   ADMIN_TASK_SEARCH_PROMPT,
   ADMIN_TASK_SEARCH_RESULTS,
   ADMIN_TASK_SEARCH_NO_RESULTS,
+  ADMIN_TASKS_NO_RESULTS,
+  CATEGORY_KEY_LABELS,
 } from '../../../i18n/ru';
 
 function taskExpiresAtLabel(task: { createdAt: Date; taskExpiryHours: number | null }): string | null {
@@ -63,13 +66,26 @@ function taskExpiresAtLabel(task: { createdAt: Date; taskExpiryHours: number | n
   return expiresAt.toLocaleString('ru-RU', { timeZone: 'Europe/Kiev' });
 }
 
-// ── Admin task list ─────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
 
-export async function handleAdminTaskList(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery();
-  const allTasks = await getAllTasks();
+const ADMIN_CATEGORY_TABS: Array<{ key: TaskCategoryFilter; label: string }> = [
+  { key: 'all', label: 'Все' },
+  { key: 'report_app', label: '📊' },
+  { key: 'download_app', label: '📥' },
+  { key: 'install_by_key', label: '🔑' },
+  { key: 'none', label: '📋' },
+];
 
-  if (allTasks.length === 0) {
+// ── Admin task list (paginated + filtered) ──────────────────────────────────
+
+export async function showAdminTaskPage(
+  ctx: MyContext,
+  category: TaskCategoryFilter,
+  page: number,
+): Promise<void> {
+  const allTasks = await getAllTasksByFilter(category);
+
+  if (allTasks.length === 0 && category === 'all') {
     await ctx.editMessageText(ADMIN_NO_TASKS, {
       reply_markup: new InlineKeyboard()
         .text(KB.CREATE_TASK, 'admin:task:create')
@@ -79,10 +95,61 @@ export async function handleAdminTaskList(ctx: MyContext): Promise<void> {
     return;
   }
 
-  await ctx.editMessageText(ADMIN_TASKS_HEADER(allTasks.length), {
+  const totalPages = Math.max(1, Math.ceil(allTasks.length / PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const pageTasks = allTasks.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const kb = new InlineKeyboard();
+
+  // Category tabs row
+  for (const tab of ADMIN_CATEGORY_TABS) {
+    const label = tab.key === category ? `▸ ${tab.label}` : tab.label;
+    kb.text(label, `admin:tasks:page:${tab.key}:0`);
+  }
+  kb.row();
+
+  // Task rows
+  for (const task of pageTasks) {
+    const icon = task.isActive ? '🟢' : '🔴';
+    kb.text(`${icon} ${task.title}`, `admin:task:view:${task.id}`).row();
+  }
+
+  // Pagination row
+  if (totalPages > 1) {
+    if (safePage > 0) kb.text('← Пред.', `admin:tasks:page:${category}:${safePage - 1}`);
+    kb.text(`${safePage + 1} / ${totalPages}`, 'admin:tasks:noop');
+    if (safePage < totalPages - 1) kb.text('След. →', `admin:tasks:page:${category}:${safePage + 1}`);
+    kb.row();
+  }
+
+  kb.text(KB.CREATE_TASK, 'admin:task:create')
+    .row()
+    .text(KB.SEARCH_TASKS, 'admin:task:search')
+    .row()
+    .text(KB.BACK, 'admin:menu');
+
+  const headerText = allTasks.length === 0
+    ? ADMIN_TASKS_NO_RESULTS(CATEGORY_KEY_LABELS[category] ?? 'Все')
+    : ADMIN_TASKS_HEADER(allTasks.length);
+
+  await ctx.editMessageText(headerText, {
     parse_mode: 'HTML',
-    reply_markup: adminTaskListKeyboard(allTasks),
+    reply_markup: kb,
   });
+}
+
+export async function handleAdminTaskList(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showAdminTaskPage(ctx, 'all', 0);
+}
+
+export async function handleAdminTaskPageCallback(
+  ctx: MyContext,
+  category: TaskCategoryFilter,
+  page: number,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showAdminTaskPage(ctx, category, page);
 }
 
 // ── Task detail (admin view) ────────────────────────────────────────────────
@@ -183,21 +250,7 @@ export async function handleAdminTaskDelete(ctx: MyContext, taskId: number): Pro
   }
 
   await ctx.answerCallbackQuery({ text: ADMIN_TASK_DELETED });
-  const allTasks = await getAllTasks();
-
-  await ctx.editMessageText(
-    allTasks.length > 0 ? ADMIN_TASKS_HEADER(allTasks.length) : ADMIN_NO_TASKS,
-    {
-      parse_mode: 'HTML',
-      reply_markup:
-        allTasks.length > 0
-          ? adminTaskListKeyboard(allTasks)
-          : new InlineKeyboard()
-              .text(KB.CREATE_TASK, 'admin:task:create')
-              .row()
-              .text(KB.BACK, 'admin:menu'),
-    },
-  );
+  await showAdminTaskPage(ctx, 'all', 0);
 }
 
 // ── Task creation — multi-step session flow ─────────────────────────────────

@@ -23,6 +23,8 @@ import {
   ADMIN_PAYOUT_RECORDED_LABEL,
   ADMIN_PAYOUT_RECORDED_TEXT,
   ADMIN_PAYOUT_NOTIFY,
+  ADMIN_PAYOUT_NOTIFY_WITH_PROOF,
+  ADMIN_PAYOUT_PROOF_PROMPT,
   ADMIN_PAYOUT_SHOW_CARD,
   ADMIN_PAYOUT_NO_CARD,
 } from '../../../i18n/ru';
@@ -31,6 +33,7 @@ import {
 
 export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
+  ctx.session.pendingPayoutUserId = undefined;
 
   const queue = await getPayoutQueue();
 
@@ -64,6 +67,7 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
 
 export async function handleAdminPayoutView(ctx: MyContext, userId: number): Promise<void> {
   await ctx.answerCallbackQuery();
+  ctx.session.pendingPayoutUserId = undefined;
 
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
@@ -148,38 +152,109 @@ export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): 
   );
 }
 
-// ── Mark as paid ────────────────────────────────────────────────────────────
+// ── Mark as paid — ask for proof screenshot ─────────────────────────────────
 
 export async function handleAdminPayoutMarkPaid(ctx: MyContext, userId: number): Promise<void> {
-  const telegramId = ctx.from!.id.toString();
-  const adminUser = await getUserByTelegramId(telegramId);
+  await ctx.answerCallbackQuery();
 
-  const result = await processUserPayout(userId, adminUser?.id ?? 0);
+  const queue = await getPayoutQueue();
+  const item = queue.find((q) => q.user.id === userId);
 
-  if (!result) {
-    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_FAILED, show_alert: true });
+  if (!item) {
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_NO_LONGER_ELIGIBLE, show_alert: true });
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_RECORDED_LABEL });
+  const name = item.user.username
+    ? `@${item.user.username}`
+    : item.user.firstName ?? item.user.telegramId;
+
+  ctx.session.pendingPayoutUserId = userId;
 
   await ctx.editMessageText(
-    ADMIN_PAYOUT_RECORDED_TEXT(result.payoutId, result.userName, parseFloat(result.amount).toFixed(2)),
+    ADMIN_PAYOUT_PROOF_PROMPT(name, parseFloat(item.balance).toFixed(2)),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
-        .text(KB.BACK_QUEUE, 'admin:payouts')
+        .text(KB.SKIP_NO_PROOF, `admin:payout:proof_skip:${userId}`)
         .row()
-        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
+        .text(KB.CANCEL, `admin:payout:view:${userId}`),
     },
   );
+}
+
+// ── Skip proof — record payout without screenshot ───────────────────────────
+
+export async function handleAdminPayoutProofSkip(ctx: MyContext, userId: number): Promise<void> {
+  await ctx.answerCallbackQuery();
+  ctx.session.pendingPayoutUserId = undefined;
+  await finalisePayout(ctx, userId);
+}
+
+// ── Proof photo received ────────────────────────────────────────────────────
+
+export async function handleAdminPayoutProofPhoto(ctx: MyContext): Promise<void> {
+  const userId = ctx.session.pendingPayoutUserId;
+  if (!userId) return;
+
+  const photos = ctx.message?.photo;
+  if (!photos || photos.length === 0) return;
+
+  const photo = photos[photos.length - 1];
+  ctx.session.pendingPayoutUserId = undefined;
+
+  await finalisePayout(ctx, userId, photo.file_id);
+}
+
+// ── Shared payout finalisation ──────────────────────────────────────────────
+
+async function finalisePayout(
+  ctx: MyContext,
+  userId: number,
+  proofTelegramFileId?: string,
+): Promise<void> {
+  const telegramId = ctx.from!.id.toString();
+  const adminUser = await getUserByTelegramId(telegramId);
+
+  const result = await processUserPayout(userId, adminUser?.id ?? 0, proofTelegramFileId);
+
+  if (!result) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_FAILED, show_alert: true });
+    } else {
+      await ctx.reply(ADMIN_PAYOUT_FAILED);
+    }
+    return;
+  }
+
+  const successText = ADMIN_PAYOUT_RECORDED_TEXT(
+    result.payoutId, result.userName, parseFloat(result.amount).toFixed(2),
+  );
+  const successKb = new InlineKeyboard()
+    .text(KB.BACK_QUEUE, 'admin:payouts')
+    .row()
+    .text(KB.BACK_ADMIN_MENU, 'admin:menu');
+
+  if (ctx.callbackQuery) {
+    await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_RECORDED_LABEL });
+    await ctx.editMessageText(successText, { parse_mode: 'HTML', reply_markup: successKb });
+  } else {
+    await ctx.reply(successText, { parse_mode: 'HTML', reply_markup: successKb });
+  }
 
   try {
-    await ctx.api.sendMessage(
-      result.userTelegramId,
-      ADMIN_PAYOUT_NOTIFY(parseFloat(result.amount).toFixed(2)),
-      { parse_mode: 'HTML' },
-    );
+    const notifyText = proofTelegramFileId
+      ? ADMIN_PAYOUT_NOTIFY_WITH_PROOF(parseFloat(result.amount).toFixed(2))
+      : ADMIN_PAYOUT_NOTIFY(parseFloat(result.amount).toFixed(2));
+
+    if (proofTelegramFileId) {
+      await ctx.api.sendPhoto(result.userTelegramId, proofTelegramFileId, {
+        caption: notifyText,
+        parse_mode: 'HTML',
+      });
+    } else {
+      await ctx.api.sendMessage(result.userTelegramId, notifyText, { parse_mode: 'HTML' });
+    }
   } catch {
     // User may have blocked the bot
   }

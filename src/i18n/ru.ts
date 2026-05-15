@@ -112,6 +112,8 @@ export const CATEGORY_KEY_LABELS: Record<string, string> = {
 
 export const ADMIN_NO_TASKS = '📋 Заданий пока нет.';
 export const ADMIN_TASKS_HEADER = (count: number) => `📋 <b>Все задания</b> (${count})`;
+export const ADMIN_TASKS_NO_RESULTS = (label: string) =>
+  `📋 <b>Задания</b>\n\n<i>В категории «${label}» заданий нет.</i>`;
 export const ADMIN_TASK_NOT_FOUND = '❌ Задание не найдено';
 export const ADMIN_TASK_ACTIVE_STATUS = '🟢 Активно';
 export const ADMIN_TASK_INACTIVE_STATUS = '🔴 Неактивно';
@@ -389,6 +391,18 @@ export const ADMIN_PAYOUT_SHOW_CARD = (formatted: string) =>
 
 export const ADMIN_PAYOUT_NO_CARD = 'Карта не указана';
 
+export const ADMIN_PAYOUT_PROOF_PROMPT = (name: string, amount: string) =>
+  `📎 <b>Подтверждение выплаты</b>\n\n` +
+  `Пользователь: <b>${name}</b>\n` +
+  `Сумма: <b>${amount} грн</b>\n\n` +
+  `Отправьте скриншот подтверждения платежа или нажмите <b>Пропустить</b>:`;
+
+export const ADMIN_PAYOUT_NOTIFY_WITH_PROOF = (amount: string) =>
+  `💸 <b>Оплата отправлена!</b>\n\n` +
+  `Вы получили <b>${amount} грн</b>.\n` +
+  `Ваш баланс обнулён.\n\n` +
+  `Выполняйте задания, чтобы зарабатывать больше!`;
+
 // ── Admin task media ───────────────────────────────────────────────────────
 
 export const ADMIN_TASK_MEDIA_HEADER = (title: string, fileCount: number) =>
@@ -418,6 +432,8 @@ export const ADMIN_TASK_MEDIA_DONE_BTN = (count: number) =>
 // ── User tasks ─────────────────────────────────────────────────────────────
 
 export const USER_NO_TASKS = '📋 Нет доступных заданий. Загляните позже!';
+export const USER_NO_TASKS_IN_CATEGORY = (label: string) =>
+  `📋 <b>Доступные задания</b>\n\n<i>В категории «${label}» доступных заданий нет.</i>`;
 export const USER_TASKS_HEADER = (count: number) => `📋 <b>Доступные задания</b> (${count})`;
 export const USER_TASKS_FOOTER = '<i>Выберите задание для подробностей.</i>';
 export const USER_TASK_UNAVAILABLE = '❌ Это задание больше недоступно.';
@@ -559,6 +575,36 @@ export const USER_REPORT_ADMIN_COMMENT = (comment: string) =>
 export const USER_REPORT_APPROVED_HINT = (threshold: number) =>
   `\n\n✅ <i>Оплата будет произведена, когда ваш баланс достигнет ${threshold} грн.</i>`;
 
+// ── Payment proofs gallery ─────────────────────────────────────────────────
+
+export const ADMIN_PROOFS_HEADER = (count: number) =>
+  `📸 <b>Доказательства выплат</b>\n\n` +
+  (count === 0
+    ? `Скриншотов пока нет.`
+    : `Загружено скриншотов: <b>${count}</b>`);
+
+export const ADMIN_PROOFS_UPLOAD_PROMPT = (count: number) =>
+  `📸 <b>Загрузка скриншотов</b>\n\n` +
+  `Отправьте фото (скриншоты подтверждений платежей).\n\n` +
+  `Загружено: <b>${count}</b>`;
+
+export const ADMIN_PROOFS_ADDED = '✅ Скриншот добавлен.';
+export const ADMIN_PROOFS_SAVED = '✅ Скриншоты сохранены.';
+export const ADMIN_PROOFS_UPLOAD_FAILED = '❌ Ошибка загрузки. Попробуйте ещё раз.';
+
+export const ADMIN_PROOFS_CLEAR_CONFIRM =
+  `🗑 <b>Удалить все скриншоты?</b>\n\nЭто действие необратимо.`;
+
+export const ADMIN_PROOFS_CLEARED = '🗑 Все скриншоты удалены.';
+
+export const USER_PROOFS_EMPTY =
+  `📸 <b>Доказательства выплат</b>\n\n<i>Пока нет загруженных скриншотов.</i>`;
+
+export const USER_PROOFS_HEADER = (count: number) =>
+  `📸 <b>Доказательства выплат</b>\n\n` +
+  `Скриншотов: <b>${count}</b>\n\n` +
+  `<i>Скриншоты подтверждений оплат от администраторов:</i>`;
+
 // ── User profile ───────────────────────────────────────────────────────────
 
 export const USER_PROFILE_HEADER = (binanceId: string | null, maskedCard: string | null) =>
@@ -656,9 +702,12 @@ export const KB = {
   REX_COMMENT: '✏️ Изменить комментарий',
   REX_DELETE: '🗑 Удалить пример',
   REX_MEDIA: (count: number) => count > 0 ? `📎 Медиа (${count})` : '📎 Добавить медиа',
+  UPLOAD_PROOFS: '➕ Загрузить скриншоты',
+  CLEAR_PROOFS: '🗑 Удалить все',
   EDIT_BINANCE: '✏️ Изменить Binance ID',
   EDIT_CARD: '✏️ Изменить карту',
   SEARCH_TASKS: '🔍 Найти по пакету',
+  SKIP_NO_PROOF: 'Пропустить (без скриншота) ▶',
 };
 
 // ── Main / admin menu labels ───────────────────────────────────────────────
@@ -674,7 +723,9 @@ export const MENU = {
   ADMIN_REPORTS: '📊 Отчёты',
   ADMIN_PAYOUTS: '💰 Выплаты',
   ADMIN_REPORT_EXAMPLES: '📝 Примеры отчётов',
+  ADMIN_PROOFS: '📸 Доказательства выплат',
   MY_PROFILE: '👤 Профиль',
+  PROOFS: '📸 Доказательства выплат',
   ADMIN_USER_MENU: '👤 Меню пользователя',
   ADMIN_DEACTIVATE: '🔴 Деактивировать',
   ADMIN_ACTIVATE: '🟢 Активировать',

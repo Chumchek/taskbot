@@ -1,12 +1,13 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
-import { mainMenuKeyboard, userTaskListKeyboard, userTaskDetailKeyboard } from '../../keyboards';
+import { mainMenuKeyboard, userTaskDetailKeyboard } from '../../keyboards';
 import {
   claimTask,
-  getActiveTasks,
+  getActiveTasksByFilter,
   getTaskById,
   getUserAssignments,
   getUserClaimedTaskIds,
+  TaskCategoryFilter,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
 import { getTaskMedia } from '../../../services/taskMediaService';
@@ -15,7 +16,9 @@ import {
   deadlineLabel,
   KB,
   MENU,
+  CATEGORY_KEY_LABELS,
   USER_NO_TASKS,
+  USER_NO_TASKS_IN_CATEGORY,
   USER_TASKS_HEADER,
   USER_TASKS_FOOTER,
   USER_TASK_UNAVAILABLE,
@@ -32,41 +35,90 @@ import {
   USER_TASK_HELP_NO_FILES,
 } from '../../../i18n/ru';
 
-// ── Available tasks list ────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
 
-export async function handleUserTaskList(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery();
+const USER_CATEGORY_TABS: Array<{ key: TaskCategoryFilter; label: string }> = [
+  { key: 'all', label: 'Все' },
+  { key: 'report_app', label: '📊' },
+  { key: 'download_app', label: '📥' },
+  { key: 'install_by_key', label: '🔑' },
+  { key: 'none', label: '📋' },
+];
 
+// ── Available tasks list (paginated + filtered) ─────────────────────────────
+
+async function showUserTaskPage(
+  ctx: MyContext,
+  category: TaskCategoryFilter,
+  page: number,
+): Promise<void> {
   const telegramId = ctx.from!.id.toString();
   const dbUser = await getUserByTelegramId(telegramId);
   if (!dbUser) return;
 
-  const [activeTasks, claimedIds] = await Promise.all([
-    getActiveTasks(),
+  const [allTasks, claimedIds] = await Promise.all([
+    getActiveTasksByFilter(category),
     getUserClaimedTaskIds(dbUser.id),
   ]);
 
-  if (activeTasks.length === 0) {
+  if (allTasks.length === 0 && category === 'all') {
     await ctx.editMessageText(USER_NO_TASKS, {
       reply_markup: new InlineKeyboard().text(KB.BACK, 'user:menu'),
     });
     return;
   }
 
-  const lines = activeTasks
-    .map((t) => {
-      const emoji = claimedIds.has(t.id) ? '⏳' : '🟢';
-      return `${emoji} <b>${t.title}</b> — ${t.priceUah} грн (${t.slotsAvailable} мест)`;
-    })
-    .join('\n');
+  const totalPages = Math.max(1, Math.ceil(allTasks.length / PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const pageTasks = allTasks.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
-  await ctx.editMessageText(
-    `${USER_TASKS_HEADER(activeTasks.length)}\n\n${lines}\n\n${USER_TASKS_FOOTER}`,
-    {
-      parse_mode: 'HTML',
-      reply_markup: userTaskListKeyboard(activeTasks, claimedIds),
-    },
-  );
+  const kb = new InlineKeyboard();
+
+  // Category tabs row
+  for (const tab of USER_CATEGORY_TABS) {
+    const label = tab.key === category ? `▸ ${tab.label}` : tab.label;
+    kb.text(label, `user:tasks:page:${tab.key}:0`);
+  }
+  kb.row();
+
+  // Task rows
+  for (const task of pageTasks) {
+    const label = claimedIds.has(task.id) ? `⏳ ${task.title}` : `🟢 ${task.title}`;
+    kb.text(label, `user:task:view:${task.id}`).row();
+  }
+
+  // Pagination row
+  if (totalPages > 1) {
+    if (safePage > 0) kb.text('← Пред.', `user:tasks:page:${category}:${safePage - 1}`);
+    kb.text(`${safePage + 1} / ${totalPages}`, 'user:tasks:noop');
+    if (safePage < totalPages - 1) kb.text('След. →', `user:tasks:page:${category}:${safePage + 1}`);
+    kb.row();
+  }
+
+  kb.text(KB.BACK, 'user:menu');
+
+  const headerText = allTasks.length === 0
+    ? USER_NO_TASKS_IN_CATEGORY(CATEGORY_KEY_LABELS[category] ?? 'Все')
+    : `${USER_TASKS_HEADER(allTasks.length)}\n\n${USER_TASKS_FOOTER}`;
+
+  await ctx.editMessageText(headerText, {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+  });
+}
+
+export async function handleUserTaskList(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showUserTaskPage(ctx, 'all', 0);
+}
+
+export async function handleUserTaskPageCallback(
+  ctx: MyContext,
+  category: TaskCategoryFilter,
+  page: number,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showUserTaskPage(ctx, category, page);
 }
 
 // ── Task detail ─────────────────────────────────────────────────────────────

@@ -98,6 +98,7 @@ export const payouts = pgTable('payouts', {
     .references(() => users.id),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   processedBy: integer('processed_by').references(() => users.id),
+  proofTelegramFileId: text('proof_telegram_file_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   paidAt: timestamp('paid_at'),
 });
@@ -128,6 +129,13 @@ export const reportExampleMedia = pgTable('report_example_media', {
   telegramFileId: text('telegram_file_id'),
   fileType: text('file_type').notNull(),
   fileSize: integer('file_size'),
+  uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
+});
+
+export const paymentProofs = pgTable('payment_proofs', {
+  id: serial('id').primaryKey(),
+  telegramFileId: text('telegram_file_id').notNull(),
+  uploadedBy: integer('uploaded_by').references(() => users.id),
   uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
 });
 

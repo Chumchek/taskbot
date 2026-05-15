@@ -13,6 +13,8 @@ export function mainMenuKeyboard(): InlineKeyboard {
     .text(MENU.MY_REPORTS, 'user:reports')
     .text(MENU.MY_BALANCE, 'user:balance')
     .row()
+    .text(MENU.PROOFS, 'user:proofs')
+    .row()
     .text(MENU.MY_PROFILE, 'user:profile');
 }
 
@@ -51,8 +53,21 @@ export function adminMenuKeyboard(): InlineKeyboard {
     .text(MENU.ADMIN_PAYOUTS, 'admin:payouts')
     .row()
     .text(MENU.ADMIN_REPORT_EXAMPLES, 'admin:rex')
+    .text(MENU.ADMIN_PROOFS, 'admin:proofs')
     .row()
     .text(MENU.ADMIN_USER_MENU, 'user:menu');
+}
+
+export function adminProofsKeyboard(count: number): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  kb.text(KB.UPLOAD_PROOFS, 'admin:proofs:upload').row();
+  if (count > 0) {
+    kb.text(KB.PREVIEW, 'admin:proofs:preview')
+      .text(KB.CLEAR_PROOFS, 'admin:proofs:clear_confirm')
+      .row();
+  }
+  kb.text(KB.BACK_ADMIN_MENU, 'admin:menu');
+  return kb;
 }
 
 export function approveUserKeyboard(telegramId: string): InlineKeyboard {

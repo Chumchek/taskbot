@@ -98,6 +98,7 @@ export interface PayoutResult {
 export async function processUserPayout(
   userId: number,
   adminId: number,
+  proofTelegramFileId?: string,
 ): Promise<PayoutResult | null> {
   return db.transaction(async (tx) => {
     const [user] = await tx.select().from(users).where(eq(users.id, userId));
@@ -108,7 +109,7 @@ export async function processUserPayout(
 
     const [payout] = await tx
       .insert(payouts)
-      .values({ userId, amount, processedBy: adminId, paidAt: new Date() })
+      .values({ userId, amount, processedBy: adminId, paidAt: new Date(), proofTelegramFileId: proofTelegramFileId ?? null })
       .returning();
 
     await tx.update(users).set({ balance: '0' }).where(eq(users.id, userId));
