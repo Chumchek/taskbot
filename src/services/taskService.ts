@@ -132,6 +132,15 @@ export async function getTasksByPackageName(packageName: string): Promise<Task[]
     .orderBy(tasks.id);
 }
 
+// Returns task IDs the user has completed (report approved).
+export async function getUserCompletedTaskIds(userId: number): Promise<Set<number>> {
+  const rows = await db
+    .select({ taskId: assignments.taskId })
+    .from(assignments)
+    .where(and(eq(assignments.userId, userId), eq(assignments.status, 'completed')));
+  return new Set(rows.map((r) => r.taskId));
+}
+
 // Returns task IDs the user has already claimed or completed.
 export async function getUserClaimedTaskIds(userId: number): Promise<Set<number>> {
   const rows = await db

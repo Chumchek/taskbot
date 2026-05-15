@@ -7,6 +7,7 @@ import {
   getTaskById,
   getUserAssignments,
   getUserClaimedTaskIds,
+  getUserCompletedTaskIds,
   TaskCategoryFilter,
 } from '../../../services/taskService';
 import { getUserByTelegramId } from '../../../services/userService';
@@ -56,21 +57,25 @@ async function showUserTaskPage(
   const dbUser = await getUserByTelegramId(telegramId);
   if (!dbUser) return;
 
-  const [allTasks, claimedIds] = await Promise.all([
+  const [allTasks, claimedIds, completedIds] = await Promise.all([
     getActiveTasksByFilter(category),
     getUserClaimedTaskIds(dbUser.id),
+    getUserCompletedTaskIds(dbUser.id),
   ]);
 
-  if (allTasks.length === 0 && category === 'all') {
+  // Hide tasks the user has already completed — they're done, not available again
+  const availableTasks = allTasks.filter((t) => !completedIds.has(t.id));
+
+  if (availableTasks.length === 0 && category === 'all') {
     await ctx.editMessageText(USER_NO_TASKS, {
       reply_markup: new InlineKeyboard().text(KB.BACK, 'user:menu'),
     });
     return;
   }
 
-  const totalPages = Math.max(1, Math.ceil(allTasks.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(availableTasks.length / PAGE_SIZE));
   const safePage = Math.max(0, Math.min(page, totalPages - 1));
-  const pageTasks = allTasks.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const pageTasks = availableTasks.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const kb = new InlineKeyboard();
 
@@ -97,9 +102,9 @@ async function showUserTaskPage(
 
   kb.text(KB.BACK, 'user:menu');
 
-  const headerText = allTasks.length === 0
+  const headerText = availableTasks.length === 0
     ? USER_NO_TASKS_IN_CATEGORY(CATEGORY_KEY_LABELS[category] ?? 'Все')
-    : `${USER_TASKS_HEADER(allTasks.length)}\n\n${USER_TASKS_FOOTER}`;
+    : `${USER_TASKS_HEADER(availableTasks.length)}\n\n${USER_TASKS_FOOTER}`;
 
   await ctx.editMessageText(headerText, {
     parse_mode: 'HTML',
