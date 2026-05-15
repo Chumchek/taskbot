@@ -50,6 +50,7 @@ import { TaskCategoryFilter } from '../services/taskService';
 import {
   handleAdminReportApprove,
   handleAdminReportList,
+  handleAdminReportPageCallback,
   handleAdminReportReject,
   handleAdminReportRejectAsk,
   handleAdminReportView,
@@ -225,6 +226,10 @@ export function createBot(): Bot<MyContext> {
 
   // ── Admin report callbacks ───────────────────────────────────────────────
   bot.callbackQuery('admin:reports', adminOnly, handleAdminReportList);
+  bot.callbackQuery(/^admin:reports:page:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminReportPageCallback(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery('admin:reports:noop', adminOnly, (ctx) => ctx.answerCallbackQuery());
 
   bot.callbackQuery(/^admin:report:view:(\d+)$/, adminOnly, (ctx) =>
     handleAdminReportView(ctx, parseInt(ctx.match[1], 10)),

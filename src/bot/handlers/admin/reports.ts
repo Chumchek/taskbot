@@ -24,11 +24,11 @@ import {
   ADMIN_REPORT_REJECTED_NOTIFY,
 } from '../../../i18n/ru';
 
+const REPORTS_PAGE_SIZE = 10;
+
 // ── Pending reports list ────────────────────────────────────────────────────
 
-export async function handleAdminReportList(ctx: MyContext): Promise<void> {
-  await ctx.answerCallbackQuery();
-
+async function showAdminReportPage(ctx: MyContext, page: number): Promise<void> {
   const pending = await getPendingReports();
 
   if (pending.length === 0) {
@@ -36,19 +36,41 @@ export async function handleAdminReportList(ctx: MyContext): Promise<void> {
     return;
   }
 
+  const totalPages = Math.max(1, Math.ceil(pending.length / REPORTS_PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const pageItems = pending.slice(safePage * REPORTS_PAGE_SIZE, (safePage + 1) * REPORTS_PAGE_SIZE);
+
   const kb = new InlineKeyboard();
-  for (const item of pending) {
+  for (const item of pageItems) {
     kb.text(
       `📊 #${item.report.id} — ${item.userName}: ${item.taskTitle}`,
       `admin:report:view:${item.report.id}`,
     ).row();
   }
+
+  if (totalPages > 1) {
+    if (safePage > 0) kb.text('← Пред.', `admin:reports:page:${safePage - 1}`);
+    kb.text(`${safePage + 1} / ${totalPages}`, 'admin:reports:noop');
+    if (safePage < totalPages - 1) kb.text('След. →', `admin:reports:page:${safePage + 1}`);
+    kb.row();
+  }
+
   kb.text(KB.BACK, 'admin:menu');
 
   await ctx.editMessageText(ADMIN_REPORTS_HEADER(pending.length), {
     parse_mode: 'HTML',
     reply_markup: kb,
   });
+}
+
+export async function handleAdminReportList(ctx: MyContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showAdminReportPage(ctx, 0);
+}
+
+export async function handleAdminReportPageCallback(ctx: MyContext, page: number): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await showAdminReportPage(ctx, page);
 }
 
 // ── View report detail + forward media ─────────────────────────────────────
