@@ -221,7 +221,8 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
   const dbUser = await getUserByTelegramId(telegramId);
   if (!dbUser) return;
 
-  const assignments = await getUserAssignments(dbUser.id);
+  const allAssignments = await getUserAssignments(dbUser.id);
+  const assignments = allAssignments.filter((a) => a.status !== 'completed');
 
   if (assignments.length === 0) {
     await ctx.editMessageText(USER_MY_TASKS_EMPTY, {
@@ -236,15 +237,15 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
 
   const lines = assignments
     .map((a) => {
-      const emoji = TASK_STATUS_EMOJI[a.status] ?? '•';
-      const statusRu = TASK_STATUS_RU[a.status] ?? a.status;
+      const emoji = a.hasPendingReport ? '🔍' : (TASK_STATUS_EMOJI[a.status] ?? '•');
+      const statusRu = a.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[a.status] ?? a.status);
       return `${emoji} <b>${a.task.title}</b> — ${a.task.priceUah} грн [${statusRu}]`;
     })
     .join('\n');
 
   const kb = new InlineKeyboard();
   for (const a of assignments) {
-    const emoji = TASK_STATUS_EMOJI[a.status] ?? '•';
+    const emoji = a.hasPendingReport ? '🔍' : (TASK_STATUS_EMOJI[a.status] ?? '•');
     kb.text(`${emoji} ${a.task.title}`, `user:assignment:view:${a.id}`).row();
   }
   kb.text(KB.BROWSE_TASKS, 'user:tasks').row().text(KB.BACK, 'user:menu');
@@ -282,8 +283,8 @@ export async function handleUserAssignmentView(
     ? assignment.expiresAt.toLocaleString('ru-RU', { timeZone: 'Europe/Kiev' })
     : '—';
 
-  const statusEmoji = TASK_STATUS_EMOJI[assignment.status] ?? '•';
-  const statusRu = TASK_STATUS_RU[assignment.status] ?? assignment.status;
+  const statusEmoji = assignment.hasPendingReport ? '🔍' : (TASK_STATUS_EMOJI[assignment.status] ?? '•');
+  const statusRu = assignment.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[assignment.status] ?? assignment.status);
 
   const text = USER_ASSIGNMENT_DETAIL(
     task.title, task.description, task.link, task.priceUah, deadline, statusEmoji, statusRu,

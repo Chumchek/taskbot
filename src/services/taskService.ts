@@ -156,14 +156,22 @@ export async function getUserClaimedTaskIds(userId: number): Promise<Set<number>
 }
 
 export async function getUserAssignments(userId: number): Promise<
-  Array<Assignment & { task: Task }>
+  Array<Assignment & { task: Task; hasPendingReport: boolean }>
 > {
   const rows = await db
-    .select({ assignment: assignments, task: tasks })
+    .select({ assignment: assignments, task: tasks, pendingReportId: reports.id })
     .from(assignments)
     .innerJoin(tasks, eq(assignments.taskId, tasks.id))
+    .leftJoin(
+      reports,
+      and(eq(reports.assignmentId, assignments.id), eq(reports.status, 'pending')),
+    )
     .where(eq(assignments.userId, userId));
-  return rows.map((r) => ({ ...r.assignment, task: r.task }));
+  return rows.map((r) => ({
+    ...r.assignment,
+    task: r.task,
+    hasPendingReport: r.pendingReportId !== null,
+  }));
 }
 
 export type ClaimResult =
