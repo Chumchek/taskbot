@@ -10,6 +10,7 @@ import {
 import { getUserByTelegramId } from '../../../services/userService';
 import {
   KB,
+  ADMIN_PANEL_HEADER,
   ADMIN_NO_PENDING_REPORTS,
   ADMIN_REPORTS_HEADER,
   ADMIN_REPORT_NOT_FOUND,
@@ -89,6 +90,7 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
     timeZone: 'Europe/Kiev',
   });
 
+  // Show report info in the current (menu) message — no action buttons yet
   await ctx.editMessageText(
     ADMIN_REPORT_DETAIL(
       reportId,
@@ -99,16 +101,10 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
       item.mediaFiles.length,
       item.packageName,
     ),
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text('✅ Одобрить', `admin:report:approve:${reportId}`)
-        .text('❌ Отклонить', `admin:report:reject_ask:${reportId}`)
-        .row()
-        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports'),
-    },
+    { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text(KB.BACK_REPORTS_ADMIN, 'admin:reports') },
   );
 
+  // Send media files
   for (const file of item.mediaFiles) {
     if (!file.telegramFileId) continue;
     try {
@@ -125,6 +121,25 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
       });
     }
   }
+
+  // Send action buttons AFTER photos so they appear at the bottom
+  await ctx.reply(
+    ADMIN_REPORT_DETAIL(
+      reportId,
+      item.taskTitle,
+      item.userName,
+      item.priceUah,
+      submittedAt,
+      item.mediaFiles.length,
+      item.packageName,
+    ),
+    {
+      parse_mode: 'HTML',
+      reply_markup: new InlineKeyboard()
+        .text('✅ Одобрить', `admin:report:approve:${reportId}`)
+        .text('❌ Отклонить', `admin:report:reject_ask:${reportId}`),
+    },
+  );
 }
 
 // ── Approve ─────────────────────────────────────────────────────────────────
@@ -150,14 +165,13 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
       result.priceUah,
       result.newBalance,
     ),
-    {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
-        .row()
-        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
-    },
+    { parse_mode: 'HTML' },
   );
+
+  await ctx.reply(ADMIN_PANEL_HEADER, {
+    parse_mode: 'HTML',
+    reply_markup: adminMenuKeyboard(),
+  });
 
   try {
     await ctx.api.sendMessage(
@@ -213,12 +227,13 @@ export async function handleAdminReportReject(
     await ctx.answerCallbackQuery({ text: ADMIN_REPORT_REJECTED_LABEL });
     await ctx.editMessageText(ADMIN_REPORT_REJECTED_TEXT(reportId, comment), {
       parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard()
-        .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
-        .row()
-        .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
     });
   }
+
+  await ctx.reply(ADMIN_PANEL_HEADER, {
+    parse_mode: 'HTML',
+    reply_markup: adminMenuKeyboard(),
+  });
 
   try {
     await ctx.api.sendMessage(
@@ -241,12 +256,4 @@ export async function handleAdminRejectCommentText(
   if (!comment) return;
 
   await handleAdminReportReject(ctx, reportId, comment);
-
-  await ctx.reply(ADMIN_REPORT_REJECTED_TEXT(reportId, comment), {
-    parse_mode: 'HTML',
-    reply_markup: new InlineKeyboard()
-      .text(KB.BACK_REPORTS_ADMIN, 'admin:reports')
-      .row()
-      .text(KB.BACK_ADMIN_MENU, 'admin:menu'),
-  });
 }

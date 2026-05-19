@@ -14,6 +14,10 @@ export async function getPendingUsers(): Promise<User[]> {
   return db.select().from(users).where(eq(users.status, 'pending'));
 }
 
+export async function getApprovedUsers(): Promise<User[]> {
+  return db.select().from(users).where(eq(users.status, 'approved'));
+}
+
 export async function approveUser(telegramId: string): Promise<User | undefined> {
   const [user] = await db
     .update(users)

@@ -58,7 +58,9 @@ import {
   ADMIN_TASK_SEARCH_NO_RESULTS,
   ADMIN_TASKS_NO_RESULTS,
   CATEGORY_KEY_LABELS,
+  NEW_TASK_NOTIFY,
 } from '../../../i18n/ru';
+import { getApprovedUsers } from '../../../services/userService';
 
 function taskExpiresAtLabel(task: { createdAt: Date; taskExpiryHours: number | null }): string | null {
   if (!task.taskExpiryHours) return null;
@@ -519,6 +521,14 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
       .row()
       .text(KB.BACK_ADMIN, 'admin:menu'),
   });
+
+  // Broadcast to all approved users — fire-and-forget, errors are non-critical
+  getApprovedUsers().then((users) => {
+    const text = NEW_TASK_NOTIFY(task.title, task.priceUah);
+    for (const user of users) {
+      ctx.api.sendMessage(user.telegramId, text, { parse_mode: 'HTML' }).catch(() => {});
+    }
+  }).catch(() => {});
 }
 
 export async function handleAdminTaskCancelCreate(ctx: MyContext): Promise<void> {

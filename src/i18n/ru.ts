@@ -229,6 +229,9 @@ export const ADMIN_TASK_SUMMARY = (
 export const ADMIN_TASK_CREATED = (title: string, priceUah: string, slotsTotal: number) =>
   `✅ <b>Задание создано!</b>\n\n<b>${title}</b>\n💰 ${priceUah} грн | 👥 ${slotsTotal} мест`;
 
+export const NEW_TASK_NOTIFY = (title: string, priceUah: string) =>
+  `🆕 <b>Новое задание!</b>\n\n<b>${title}</b>\n💰 ${priceUah} грн\n\nОткройте раздел «Задания», чтобы взять его.`;
+
 // ── Admin reports ──────────────────────────────────────────────────────────
 
 export const ADMIN_NO_PENDING_REPORTS = '✅ Нет отчётов на проверке.';
