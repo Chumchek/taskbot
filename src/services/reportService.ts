@@ -10,6 +10,7 @@ export interface ReportWithContext {
   userName: string;
   userTelegramId: string;
   taskTitle: string;
+  taskCategory: string | null;
   priceUah: string;
   packageName: string | null;
   mediaFiles: Media[];
@@ -43,7 +44,7 @@ export async function getPendingReports(): Promise<ReportWithContext[]> {
     .select({
       report: reports,
       user: { telegramId: users.telegramId, username: users.username, firstName: users.firstName },
-      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName },
+      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName, category: tasks.category },
     })
     .from(reports)
     .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
@@ -63,6 +64,7 @@ export async function getPendingReports(): Promise<ReportWithContext[]> {
       userName: row.user.username ? `@${row.user.username}` : row.user.firstName ?? 'Unknown',
       userTelegramId: row.user.telegramId,
       taskTitle: row.task.title,
+      taskCategory: row.task.category ?? null,
       priceUah: row.task.priceUah,
       packageName: row.task.packageName ?? null,
       mediaFiles,
@@ -77,7 +79,7 @@ export async function getReportWithContext(reportId: number): Promise<ReportWith
     .select({
       report: reports,
       user: { telegramId: users.telegramId, username: users.username, firstName: users.firstName },
-      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName },
+      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName, category: tasks.category },
     })
     .from(reports)
     .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
@@ -94,6 +96,7 @@ export async function getReportWithContext(reportId: number): Promise<ReportWith
     userName: row.user.username ? `@${row.user.username}` : row.user.firstName ?? 'Unknown',
     userTelegramId: row.user.telegramId,
     taskTitle: row.task.title,
+    taskCategory: row.task.category ?? null,
     priceUah: row.task.priceUah,
     packageName: row.task.packageName ?? null,
     mediaFiles,
@@ -104,6 +107,7 @@ export async function getReportWithContext(reportId: number): Promise<ReportWith
 
 export interface ApprovalResult {
   userTelegramId: string;
+  userName: string;
   taskTitle: string;
   priceUah: string;
   newBalance: string;
@@ -119,7 +123,7 @@ export async function approveReport(
         report: reports,
         assignment: assignments,
         task: { id: tasks.id, title: tasks.title, priceUah: tasks.priceUah },
-        user: { id: users.id, telegramId: users.telegramId },
+        user: { id: users.id, telegramId: users.telegramId, username: users.username, firstName: users.firstName },
       })
       .from(reports)
       .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
@@ -152,6 +156,7 @@ export async function approveReport(
 
     return {
       userTelegramId: row.user.telegramId,
+      userName: row.user.username ? `@${row.user.username}` : row.user.firstName ?? 'Unknown',
       taskTitle: row.task.title,
       priceUah: row.task.priceUah,
       newBalance: updatedUser?.balance ?? '0',
@@ -239,6 +244,63 @@ export interface UserReportSummary {
   adminComment: string | null;
   submittedAt: Date;
   reviewedAt: Date | null;
+}
+
+// ── Admin: pending reports by user ──────────────────────────────────────────
+
+export async function getPendingReportsByUser(userTelegramId: string): Promise<ReportWithContext[]> {
+  const rows = await db
+    .select({
+      report: reports,
+      user: { telegramId: users.telegramId, username: users.username, firstName: users.firstName },
+      task: { title: tasks.title, priceUah: tasks.priceUah, packageName: tasks.packageName, category: tasks.category },
+    })
+    .from(reports)
+    .innerJoin(assignments, eq(reports.assignmentId, assignments.id))
+    .innerJoin(users, eq(assignments.userId, users.id))
+    .innerJoin(tasks, eq(assignments.taskId, tasks.id))
+    .where(and(eq(reports.status, 'pending'), eq(users.telegramId, userTelegramId)));
+
+  const result: ReportWithContext[] = [];
+  for (const row of rows) {
+    const mediaFiles = await db.select().from(media).where(eq(media.reportId, row.report.id));
+    result.push({
+      report: row.report,
+      userName: row.user.username ? `@${row.user.username}` : row.user.firstName ?? 'Unknown',
+      userTelegramId: row.user.telegramId,
+      taskTitle: row.task.title,
+      taskCategory: row.task.category ?? null,
+      priceUah: row.task.priceUah,
+      packageName: row.task.packageName ?? null,
+      mediaFiles,
+    });
+  }
+  return result;
+}
+
+export interface BulkApprovalResult {
+  approvedCount: number;
+  notifications: ApprovalResult[];
+}
+
+// Bulk approve pending reports for a user, optionally filtered by task category.
+// Pass category=undefined to approve all; category=null for tasks with no category.
+export async function approveUserReports(
+  userTelegramId: string,
+  adminId: number,
+  category?: string | null,
+): Promise<BulkApprovalResult> {
+  const pending = await getPendingReportsByUser(userTelegramId);
+  const toApprove = category === undefined
+    ? pending
+    : pending.filter((r) => r.taskCategory === category);
+
+  const notifications: ApprovalResult[] = [];
+  for (const item of toApprove) {
+    const result = await approveReport(item.report.id, adminId);
+    if (result) notifications.push(result);
+  }
+  return { approvedCount: notifications.length, notifications };
 }
 
 export async function getUserReports(userId: number): Promise<UserReportSummary[]> {

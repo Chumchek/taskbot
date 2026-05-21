@@ -55,6 +55,9 @@ import {
   handleAdminReportRejectAsk,
   handleAdminReportView,
   handleAdminRejectCommentText,
+  handleAdminUserReportList,
+  handleAdminApproveAllUserReports,
+  handleAdminApproveUserReportsByCategory,
 } from './handlers/admin/reports';
 
 // Handlers — admin payouts
@@ -242,6 +245,15 @@ export function createBot(): Bot<MyContext> {
   );
   bot.callbackQuery(/^admin:report:reject:(\d+)$/, adminOnly, (ctx) =>
     handleAdminReportReject(ctx, parseInt(ctx.match[1], 10)),
+  );
+  bot.callbackQuery(/^admin:user_reports:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminUserReportList(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:report:approve_all:(\d+)$/, adminOnly, (ctx) =>
+    handleAdminApproveAllUserReports(ctx, ctx.match[1]),
+  );
+  bot.callbackQuery(/^admin:report:approve_cat:(\d+):(.+)$/, adminOnly, (ctx) =>
+    handleAdminApproveUserReportsByCategory(ctx, ctx.match[1], ctx.match[2]),
   );
 
   // ── Admin payout callbacks ───────────────────────────────────────────────

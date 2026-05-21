@@ -236,6 +236,9 @@ export const NEW_TASK_NOTIFY = (title: string, priceUah: string) =>
 
 export const ADMIN_NO_PENDING_REPORTS = '✅ Нет отчётов на проверке.';
 export const ADMIN_REPORTS_HEADER = (count: number) => `📊 <b>Отчёты на проверке</b> (${count})`;
+export const ADMIN_USER_REPORTS_HEADER = (userName: string, count: number) =>
+  `👤 <b>${userName}</b> — ${count} отч. на проверке`;
+export const ADMIN_BULK_APPROVED = (count: number) => `✅ Одобрено ${count} отчётов.`;
 export const ADMIN_REPORT_NOT_FOUND = '❌ Отчёт не найден';
 export const ADMIN_REPORT_ALREADY_REVIEWED = '❌ Отчёт не найден или уже проверен';
 

@@ -3,7 +3,9 @@ import { MyContext } from '../../context';
 import { adminMenuKeyboard } from '../../keyboards';
 import {
   approveReport,
+  approveUserReports,
   getPendingReports,
+  getPendingReportsByUser,
   getReportWithContext,
   rejectReport,
 } from '../../../services/reportService';
@@ -13,6 +15,8 @@ import {
   ADMIN_PANEL_HEADER,
   ADMIN_NO_PENDING_REPORTS,
   ADMIN_REPORTS_HEADER,
+  ADMIN_USER_REPORTS_HEADER,
+  ADMIN_BULK_APPROVED,
   ADMIN_REPORT_NOT_FOUND,
   ADMIN_REPORT_ALREADY_REVIEWED,
   ADMIN_REPORT_DETAIL,
@@ -23,6 +27,7 @@ import {
   ADMIN_REPORT_REJECTED_LABEL,
   ADMIN_REPORT_REJECTED_TEXT,
   ADMIN_REPORT_REJECTED_NOTIFY,
+  CATEGORY_KEY_LABELS,
 } from '../../../i18n/ru';
 
 const REPORTS_PAGE_SIZE = 10;
@@ -168,9 +173,19 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
     { parse_mode: 'HTML' },
   );
 
+  // Check if this user has more pending reports — offer quick navigation
+  const morePending = await getPendingReportsByUser(result.userTelegramId);
+  const menuKb = adminMenuKeyboard();
+  if (morePending.length > 0) {
+    menuKb.row().text(
+      `👤 Ещё ${morePending.length} отч. от ${result.userName}`,
+      `admin:user_reports:${result.userTelegramId}`,
+    );
+  }
+
   await ctx.reply(ADMIN_PANEL_HEADER, {
     parse_mode: 'HTML',
-    reply_markup: adminMenuKeyboard(),
+    reply_markup: menuKb,
   });
 
   try {
@@ -256,4 +271,107 @@ export async function handleAdminRejectCommentText(
   if (!comment) return;
 
   await handleAdminReportReject(ctx, reportId, comment);
+}
+
+// ── User-specific pending reports (trust factor) ────────────────────────────
+
+export async function handleAdminUserReportList(
+  ctx: MyContext,
+  userTelegramId: string,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+
+  const pending = await getPendingReportsByUser(userTelegramId);
+
+  if (pending.length === 0) {
+    await ctx.editMessageText(ADMIN_NO_PENDING_REPORTS, { reply_markup: adminMenuKeyboard() });
+    return;
+  }
+
+  const userName = pending[0].userName;
+  const kb = new InlineKeyboard();
+
+  for (const item of pending) {
+    kb.text(
+      `📊 #${item.report.id} — ${item.taskTitle}`,
+      `admin:report:view:${item.report.id}`,
+    ).row();
+  }
+
+  // Bulk approve all
+  kb.text(`✅ Одобрить все (${pending.length})`, `admin:report:approve_all:${userTelegramId}`).row();
+
+  // Bulk approve by category — only shown when multiple distinct categories exist
+  const categories = [...new Set(pending.map((r) => r.taskCategory ?? 'none'))];
+  if (categories.length > 1) {
+    for (const cat of categories) {
+      const label = CATEGORY_KEY_LABELS[cat] ?? cat;
+      const count = pending.filter((r) => (r.taskCategory ?? 'none') === cat).length;
+      kb.text(`✅ ${label} (${count})`, `admin:report:approve_cat:${userTelegramId}:${cat}`);
+    }
+    kb.row();
+  }
+
+  kb.text(KB.BACK_REPORTS_ADMIN, 'admin:reports');
+
+  await ctx.editMessageText(ADMIN_USER_REPORTS_HEADER(userName, pending.length), {
+    parse_mode: 'HTML',
+    reply_markup: kb,
+  });
+}
+
+export async function handleAdminApproveAllUserReports(
+  ctx: MyContext,
+  userTelegramId: string,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const telegramId = ctx.from!.id.toString();
+  const adminUser = await getUserByTelegramId(telegramId);
+
+  const { approvedCount, notifications } = await approveUserReports(userTelegramId, adminUser?.id ?? 0);
+
+  await ctx.editMessageText(ADMIN_BULK_APPROVED(approvedCount), {
+    parse_mode: 'HTML',
+    reply_markup: adminMenuKeyboard(),
+  });
+
+  for (const r of notifications) {
+    try {
+      await ctx.api.sendMessage(
+        r.userTelegramId,
+        ADMIN_REPORT_APPROVED_NOTIFY(r.taskTitle, r.priceUah, r.newBalance),
+        { parse_mode: 'HTML' },
+      );
+    } catch { /* user may have blocked the bot */ }
+  }
+}
+
+export async function handleAdminApproveUserReportsByCategory(
+  ctx: MyContext,
+  userTelegramId: string,
+  category: string,
+): Promise<void> {
+  await ctx.answerCallbackQuery();
+  const telegramId = ctx.from!.id.toString();
+  const adminUser = await getUserByTelegramId(telegramId);
+
+  const dbCategory = category === 'none' ? null : category;
+  const { approvedCount, notifications } = await approveUserReports(
+    userTelegramId, adminUser?.id ?? 0, dbCategory,
+  );
+
+  await ctx.editMessageText(ADMIN_BULK_APPROVED(approvedCount), {
+    parse_mode: 'HTML',
+    reply_markup: adminMenuKeyboard(),
+  });
+
+  for (const r of notifications) {
+    try {
+      await ctx.api.sendMessage(
+        r.userTelegramId,
+        ADMIN_REPORT_APPROVED_NOTIFY(r.taskTitle, r.priceUah, r.newBalance),
+        { parse_mode: 'HTML' },
+      );
+    } catch { /* user may have blocked the bot */ }
+  }
 }
