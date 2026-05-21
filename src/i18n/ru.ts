@@ -135,7 +135,7 @@ export const ADMIN_TASK_DETAIL = (
 ) =>
   `<b>${title}</b>\n\n` +
   (categoryLabel ? `📂 Категория: <b>${categoryLabel}</b>\n` : '') +
-  (packageName ? `📦 Пакет: <b>${packageName}</b>\n` : '') +
+  (packageName ? `📦 Пакет: <code>${packageName}</code>\n` : '') +
   (description ? `📝 ${description}\n\n` : '') +
   `🔗 <a href="${link}">Ссылка на задание</a>\n` +
   `💰 Оплата: <b>${priceUah} грн</b>\n` +
@@ -216,7 +216,7 @@ export const ADMIN_TASK_SUMMARY = (
 ) =>
   `📋 <b>Итог задания</b>\n\n` +
   (categoryLabel ? `Категория: <b>${categoryLabel}</b>\n` : '') +
-  (packageName ? `Пакет: <b>${packageName}</b>\n` : '') +
+  (packageName ? `Пакет: <code>${packageName}</code>\n` : '') +
   `Название: <b>${title}</b>\n` +
   (description ? `Описание: ${description}\n` : '') +
   `Ссылка: <a href="${link}">${link}</a>\n` +
@@ -253,7 +253,7 @@ export const ADMIN_REPORT_DETAIL = (
 ) =>
   `📊 <b>Отчёт #${reportId}</b>\n\n` +
   `Задание: <b>${taskTitle}</b>\n` +
-  (packageName ? `Пакет: <b>${packageName}</b>\n` : '') +
+  (packageName ? `Пакет: <code>${packageName}</code>\n` : '') +
   `Пользователь: ${userName}\n` +
   `Вознаграждение: <b>${priceUah} грн</b>\n` +
   `Отправлен: ${submittedAt}\n` +
