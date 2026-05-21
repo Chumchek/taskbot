@@ -2,6 +2,7 @@ import { webhookCallback } from 'grammy';
 import { createServer } from 'http';
 import { config } from './config';
 import { createBot } from './bot';
+import { setupBotCommands } from './bot/setupCommands';
 import { expireAssignments } from './jobs/expireAssignments';
 import { cleanupApprovedReports } from './jobs/cleanupApprovedReports';
 import { expireTasks } from './jobs/expireTasks';
@@ -12,6 +13,9 @@ const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function main() {
   const bot = createBot();
+
+  // Set bot command menu for all users and admins
+  setupBotCommands(bot.api).catch(console.error);
 
   // Run assignment expiry once at startup, then every 5 minutes
   expireAssignments(bot.api).catch(console.error);

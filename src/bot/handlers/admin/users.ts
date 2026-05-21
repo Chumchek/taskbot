@@ -1,5 +1,6 @@
 import { MyContext } from '../../context';
 import { adminMenuKeyboard, approveUserKeyboard } from '../../keyboards';
+import { setAdminCommands } from '../../setupCommands';
 import { approveUser, banUser, deleteAdminNotifications, getAdminNotifications, getPendingUsers, promoteUser, rejectUser, unbanUser } from '../../../services/userService';
 import { decrypt, maskCard } from '../../../services/crypto';
 import {
@@ -197,4 +198,6 @@ export async function handlePromoteCommand(ctx: MyContext): Promise<void> {
 
   const name = user.username ? `@${user.username}` : user.firstName ?? args;
   await ctx.reply(ADMIN_PROMOTED(name), { parse_mode: 'HTML' });
+
+  setAdminCommands(ctx.api, user.telegramId).catch(() => {});
 }
