@@ -155,7 +155,7 @@ export async function handleUserTaskView(ctx: MyContext, taskId: number): Promis
   const dl = deadlineLabel(task.deadlineHours);
   const text = USER_TASK_DETAIL(
     task.title, task.description, task.link, task.priceUah,
-    task.slotsAvailable, dl, alreadyClaimed,
+    task.slotsAvailable, dl, alreadyClaimed, task.packageName,
   );
 
   const kb = userTaskDetailKeyboard(task.id, alreadyClaimed, task.slotsAvailable > 0);
@@ -287,7 +287,7 @@ export async function handleUserAssignmentView(
   const statusRu = assignment.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[assignment.status] ?? assignment.status);
 
   const text = USER_ASSIGNMENT_DETAIL(
-    task.title, task.description, task.link, task.priceUah, deadline, statusEmoji, statusRu,
+    task.title, task.description, task.link, task.priceUah, deadline, statusEmoji, statusRu, task.packageName,
   );
 
   const kb = new InlineKeyboard();

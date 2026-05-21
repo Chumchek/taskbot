@@ -452,13 +452,15 @@ export const USER_TASK_DETAIL = (
   slotsAvailable: number,
   dl: string,
   alreadyClaimed: boolean,
+  packageName?: string | null,
 ) =>
   `<b>${title}</b>\n\n` +
   (description ? `${description}\n\n` : '') +
   `🔗 <a href="${link}">Открыть задание</a>\n` +
   `💰 Вознаграждение: <b>${priceUah} грн</b>\n` +
   `👥 Доступных мест: <b>${slotsAvailable}</b>\n` +
-  `⏰ Дедлайн после получения: <b>${dl}</b>` +
+  `⏰ Дедлайн после получения: <b>${dl}</b>\n` +
+  (packageName ? `📦 Пакет: <code>${packageName}</code>` : '') +
   (alreadyClaimed ? '\n\n✅ <i>Вы уже взяли это задание.</i>' : '');
 
 export const USER_TASK_ALREADY_CLAIMED = '✅ Вы уже взяли это задание.';
@@ -495,12 +497,14 @@ export const USER_ASSIGNMENT_DETAIL = (
   deadline: string,
   statusEmoji: string,
   status: string,
+  packageName?: string | null,
 ) =>
   `<b>${title}</b>\n\n` +
   (description ? `📝 ${description}\n\n` : '') +
   `🔗 <a href="${link}">Открыть задание</a>\n` +
   `💰 Вознаграждение: <b>${priceUah} грн</b>\n` +
   `⏰ Дедлайн: <b>${deadline}</b>\n` +
+  (packageName ? `📦 Пакет: <code>${packageName}</code>\n` : '') +
   `Статус: ${statusEmoji} <b>${status}</b>`;
 
 export const USER_TASK_HELP_NO_FILES = 'Нет вспомогательных материалов';
