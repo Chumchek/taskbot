@@ -458,6 +458,10 @@ export function createBot(): Bot<MyContext> {
       if (desc.includes('query is too old')) return;
     }
     console.error(`[update ${err.ctx.update.update_id}]`, err.error);
+    // Always dismiss the loading spinner so the user doesn't get stuck
+    if (err.ctx.callbackQuery) {
+      err.ctx.answerCallbackQuery({ text: '⚠️ Произошла ошибка. Попробуйте ещё раз.', show_alert: false }).catch(() => {});
+    }
   });
 
   // Safety net — prevent any stray unhandled rejections from killing the process
