@@ -1,7 +1,8 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
 import { getUserByTelegramId, updateUserBinanceId, updateUserCard } from '../../../services/userService';
-import { encrypt, decrypt, maskCard } from '../../../services/crypto';
+import { encrypt, maskCard, safeMaskCard } from '../../../services/crypto';
+import { escapeHtml, escapeOptional } from '../../../utils/html';
 import { userProfileKeyboard } from '../../keyboards';
 import {
   KB,
@@ -21,12 +22,10 @@ export async function handleUserProfile(ctx: MyContext): Promise<void> {
   const dbUser = await getUserByTelegramId(telegramId);
   if (!dbUser) return;
 
-  const maskedCard = dbUser.cardEncrypted
-    ? maskCard(decrypt(dbUser.cardEncrypted))
-    : null;
+  const maskedCard = safeMaskCard(dbUser.cardEncrypted);
 
   await ctx.editMessageText(
-    USER_PROFILE_HEADER(dbUser.binanceId ?? null, maskedCard),
+    USER_PROFILE_HEADER(escapeOptional(dbUser.binanceId), escapeOptional(maskedCard)),
     {
       parse_mode: 'HTML',
       reply_markup: userProfileKeyboard(),
@@ -79,7 +78,7 @@ export async function handleProfileUpdateText(ctx: MyContext): Promise<void> {
     }
     ctx.session.paymentEditStep = undefined;
     await updateUserCard(telegramId, encrypt(digits));
-    await ctx.reply(USER_PROFILE_CARD_SAVED(maskCard(digits)), {
+    await ctx.reply(USER_PROFILE_CARD_SAVED(escapeHtml(maskCard(digits))), {
       parse_mode: 'HTML',
       reply_markup: userProfileKeyboard(),
     });

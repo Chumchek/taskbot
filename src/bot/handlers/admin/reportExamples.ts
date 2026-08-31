@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { escapeHtml, escapeOptional, MAX_DESCRIPTION } from '../../../utils/html';
 import {
   getAllExamples,
   getExampleById,
@@ -84,7 +85,7 @@ export async function handleAdminReportExampleView(
   }
 
   const media = await getExampleMedia(example.id);
-  await ctx.editMessageText(ADMIN_REX_DETAIL(label, example.comment, media.length), {
+  await ctx.editMessageText(ADMIN_REX_DETAIL(label, escapeOptional(example.comment, MAX_DESCRIPTION), media.length), {
     parse_mode: 'HTML',
     reply_markup: adminReportExampleDetailKeyboard(categoryKey, media.length),
   });
@@ -114,7 +115,7 @@ export async function handleAdminReportExampleCommentAsk(
 
   ctx.session.reportExampleCommentId = example.id;
 
-  await ctx.editMessageText(ADMIN_REX_COMMENT_PROMPT(example.comment), {
+  await ctx.editMessageText(ADMIN_REX_COMMENT_PROMPT(escapeOptional(example.comment, MAX_DESCRIPTION)), {
     parse_mode: 'HTML',
     reply_markup: new InlineKeyboard().text(KB.CANCEL, `admin:rex:cat:${categoryKey}`),
   });
@@ -136,7 +137,7 @@ export async function handleAdminReportExampleCommentText(ctx: MyContext): Promi
   const media = await getExampleMedia(example.id);
 
   await ctx.reply(ADMIN_REX_COMMENT_SAVED);
-  await ctx.reply(ADMIN_REX_DETAIL(label, example.comment, media.length), {
+  await ctx.reply(ADMIN_REX_DETAIL(label, escapeOptional(example.comment, MAX_DESCRIPTION), media.length), {
     parse_mode: 'HTML',
     reply_markup: adminReportExampleDetailKeyboard(example.categoryKey, media.length),
   });
@@ -308,11 +309,11 @@ export async function handleAdminReportExampleMediaPreview(
         else await ctx.replyWithVideo(f.telegramFileId);
       } else {
         const url = await getPresignedUrl(f.storageKey, 600);
-        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     } catch {
       const url = await getPresignedUrl(f.storageKey, 600);
-      await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+      await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
     }
   }
 }

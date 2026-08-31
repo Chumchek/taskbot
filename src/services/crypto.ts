@@ -27,3 +27,18 @@ export function maskCard(card: string): string {
   const digits = card.replace(/\s/g, '');
   return `**** **** **** ${digits.slice(-4)}`;
 }
+
+/**
+ * Masks an encrypted card without throwing. `decrypt` fails on malformed
+ * ciphertext or a rotated ENCRYPTION_KEY, and an uncaught throw inside a
+ * message builder kills the whole handler — the user just sees a dead button.
+ */
+export function safeMaskCard(encrypted: string | null | undefined): string | null {
+  if (!encrypted) return null;
+  try {
+    return maskCard(decrypt(encrypted));
+  } catch (err) {
+    console.error('[crypto] failed to decrypt card', err);
+    return null;
+  }
+}

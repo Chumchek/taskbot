@@ -2,6 +2,14 @@
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+/** Shown when a handler throws — the detail goes to the log, not to the user. */
+export const GENERIC_ERROR = '⚠️ Произошла ошибка. Попробуйте ещё раз.';
+export const GENERIC_ERROR_ADMIN = (updateId: number) =>
+  `⚠️ Произошла ошибка. Попробуйте ещё раз.\n\n<i>Код для логов: ${updateId}</i>`;
+
+/** Tail line for a list that was capped to fit Telegram's 4096-char message limit. */
+export const LIST_TRUNCATED = (hidden: number) => `<i>…и ещё ${hidden}</i>`;
+
 export function deadlineLabel(hours: number): string {
   if (hours % 24 === 0) {
     const d = hours / 24;
@@ -362,12 +370,13 @@ export const ADMIN_PAYOUT_DETAIL = (
   balance: string,
   paymentLines: string,
   taskLines: string,
+  taskCount: number,
 ) =>
   `👤 <b>${name}</b>\n` +
   `Telegram ID: <code>${telegramId}</code>\n\n` +
   `💰 К выплате: <b>${balance} грн</b>\n\n` +
   `<b>Способы оплаты:</b>\n${paymentLines || '<i>Нет данных</i>'}\n\n` +
-  `<b>Выполненные задания (текущий цикл):</b>\n${taskLines}`;
+  `<b>Выполненные задания (текущий цикл): ${taskCount}</b>\n${taskLines}`;
 
 export const ADMIN_PAYOUT_NO_TASK_DETAILS = '<i>Нет данных о заданиях.</i>';
 
@@ -664,7 +673,8 @@ export const USER_BALANCE_IN_QUEUE =
 export const USER_BALANCE_NEED_MORE = (remaining: string, threshold: number) =>
   `\n\n⏳ Нужно ещё <b>${remaining} грн</b> для достижения порога выплаты (${threshold} грн).`;
 
-export const USER_BALANCE_COMPLETED_SINCE_PAYOUT = '\n\n<b>Выполнено с последней выплаты:</b>\n';
+export const USER_BALANCE_COMPLETED_SINCE_PAYOUT = (count: number) =>
+  `\n\n<b>Выполнено с последней выплаты: ${count}</b>\n`;
 export const USER_BALANCE_NO_COMPLETED = '\n\n<i>Нет выполненных заданий в текущем цикле.</i>';
 export const USER_BALANCE_PAYMENT_METHOD = '\n\n<b>Способ оплаты:</b>\n';
 
@@ -681,6 +691,8 @@ export const KB = {
   BACK_MY_TASKS: '◀ Мои задания',
   BACK_REPORTS: '◀ К отчётам',
   BACK_QUEUE: '◀ К очереди',
+  PAGE_PREV: '← Пред.',
+  PAGE_NEXT: 'След. →',
   BACK_ADMIN: '◀ Панель администратора',
   BROWSE_TASKS: '📋 Найти задания',
   MY_TASKS: '🎯 Мои задания',

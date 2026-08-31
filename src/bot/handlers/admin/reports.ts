@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { escapeHtml, truncate } from '../../../utils/html';
 import { adminMenuKeyboard } from '../../keyboards';
 import {
   approveReport,
@@ -99,12 +100,12 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
   await ctx.editMessageText(
     ADMIN_REPORT_DETAIL(
       reportId,
-      item.taskTitle,
-      item.userName,
+      escapeHtml(truncate(item.taskTitle)),
+      escapeHtml(truncate(item.userName)),
       item.priceUah,
       submittedAt,
       item.mediaFiles.length,
-      item.packageName,
+      item.packageName ? escapeHtml(item.packageName) : item.packageName,
     ),
     { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text(KB.BACK_REPORTS_ADMIN, 'admin:reports') },
   );
@@ -121,7 +122,7 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
     } catch {
       const { getPresignedUrl } = await import('../../../services/storageService');
       const url = await getPresignedUrl(file.storageKey, 600);
-      await ctx.reply(`🔗 <a href="${url}">Открыть файл (ссылка на 10 мин.)</a>`, {
+      await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл (ссылка на 10 мин.)</a>`, {
         parse_mode: 'HTML',
       });
     }
@@ -131,12 +132,12 @@ export async function handleAdminReportView(ctx: MyContext, reportId: number): P
   await ctx.reply(
     ADMIN_REPORT_DETAIL(
       reportId,
-      item.taskTitle,
-      item.userName,
+      escapeHtml(truncate(item.taskTitle)),
+      escapeHtml(truncate(item.userName)),
       item.priceUah,
       submittedAt,
       item.mediaFiles.length,
-      item.packageName,
+      item.packageName ? escapeHtml(item.packageName) : item.packageName,
     ),
     {
       parse_mode: 'HTML',
@@ -165,8 +166,8 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
   await ctx.editMessageText(
     ADMIN_REPORT_APPROVED_TEXT(
       reportId,
-      result.taskTitle,
-      result.userTelegramId,
+      escapeHtml(truncate(result.taskTitle)),
+      escapeHtml(result.userTelegramId),
       result.priceUah,
       result.newBalance,
     ),
@@ -191,7 +192,7 @@ export async function handleAdminReportApprove(ctx: MyContext, reportId: number)
   try {
     await ctx.api.sendMessage(
       result.userTelegramId,
-      ADMIN_REPORT_APPROVED_NOTIFY(result.taskTitle, result.priceUah, result.newBalance),
+      ADMIN_REPORT_APPROVED_NOTIFY(escapeHtml(truncate(result.taskTitle)), result.priceUah, result.newBalance),
       { parse_mode: 'HTML' },
     );
   } catch {
@@ -240,7 +241,7 @@ export async function handleAdminReportReject(
 
   if (ctx.callbackQuery) {
     await ctx.answerCallbackQuery({ text: ADMIN_REPORT_REJECTED_LABEL });
-    await ctx.editMessageText(ADMIN_REPORT_REJECTED_TEXT(reportId, comment), {
+    await ctx.editMessageText(ADMIN_REPORT_REJECTED_TEXT(reportId, escapeHtml(comment)), {
       parse_mode: 'HTML',
     });
   }
@@ -253,7 +254,7 @@ export async function handleAdminReportReject(
   try {
     await ctx.api.sendMessage(
       result.userTelegramId,
-      ADMIN_REPORT_REJECTED_NOTIFY(result.taskTitle, comment),
+      ADMIN_REPORT_REJECTED_NOTIFY(escapeHtml(truncate(result.taskTitle)), escapeHtml(comment)),
       { parse_mode: 'HTML' },
     );
   } catch {
@@ -339,7 +340,7 @@ export async function handleAdminApproveAllUserReports(
     try {
       await ctx.api.sendMessage(
         r.userTelegramId,
-        ADMIN_REPORT_APPROVED_NOTIFY(r.taskTitle, r.priceUah, r.newBalance),
+        ADMIN_REPORT_APPROVED_NOTIFY(escapeHtml(truncate(r.taskTitle)), r.priceUah, r.newBalance),
         { parse_mode: 'HTML' },
       );
     } catch { /* user may have blocked the bot */ }
@@ -369,7 +370,7 @@ export async function handleAdminApproveUserReportsByCategory(
     try {
       await ctx.api.sendMessage(
         r.userTelegramId,
-        ADMIN_REPORT_APPROVED_NOTIFY(r.taskTitle, r.priceUah, r.newBalance),
+        ADMIN_REPORT_APPROVED_NOTIFY(escapeHtml(truncate(r.taskTitle)), r.priceUah, r.newBalance),
         { parse_mode: 'HTML' },
       );
     } catch { /* user may have blocked the bot */ }

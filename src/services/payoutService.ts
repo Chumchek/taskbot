@@ -75,15 +75,28 @@ export interface PaymentInfo {
 }
 
 export function getPaymentInfo(user: User): PaymentInfo {
+  const card = getDecryptedCard(user);
   return {
     binanceId: user.binanceId ?? null,
-    maskedCard: user.cardEncrypted ? maskCard(decrypt(user.cardEncrypted)) : null,
+    maskedCard: card ? maskCard(card) : null,
     hasEncryptedCard: !!user.cardEncrypted,
   };
 }
 
+/**
+ * Returns null instead of throwing when the stored ciphertext cannot be read
+ * (malformed value, or ENCRYPTION_KEY rotated since it was written). Throwing
+ * here used to take down the whole payout-detail handler, leaving the admin
+ * with a button that appears to do nothing.
+ */
 export function getDecryptedCard(user: User): string | null {
-  return user.cardEncrypted ? decrypt(user.cardEncrypted) : null;
+  if (!user.cardEncrypted) return null;
+  try {
+    return decrypt(user.cardEncrypted);
+  } catch (err) {
+    console.error(`[payout] failed to decrypt card for user ${user.id}`, err);
+    return null;
+  }
 }
 
 // ── Process payout ──────────────────────────────────────────────────────────

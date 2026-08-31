@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { buildBoundedList, escapeHtml, truncate } from '../../../utils/html';
 import { getUserByTelegramId, getAllAdminIds } from '../../../services/userService';
 import { getTaskById, getUserAssignments } from '../../../services/taskService';
 import { toCategoryKey, getExampleForUser } from '../../../services/reportExampleService';
@@ -92,7 +93,7 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
   };
 
   const sent = await ctx.editMessageText(
-    USER_REPORT_START_PROMPT(assignment.task.title, MAX_FILES, 0),
+    USER_REPORT_START_PROMPT(escapeHtml(truncate(assignment.task.title)), MAX_FILES, 0),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
@@ -117,11 +118,11 @@ export async function handleReportStart(ctx: MyContext, assignmentId: number): P
           else await ctx.replyWithVideo(f.telegramFileId);
         } else {
           const url = await getPresignedUrl(f.storageKey, 600);
-          await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+          await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
         }
       } catch {
         const url = await getPresignedUrl(f.storageKey, 600);
-        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     }
   }
@@ -208,7 +209,7 @@ async function processMediaFile(
       await ctx.api.editMessageText(
         ctx.chat!.id,
         pendingReport.promptMsgId,
-        USER_REPORT_START_PROMPT(pendingReport.taskTitle, MAX_FILES, fileCount),
+        USER_REPORT_START_PROMPT(escapeHtml(truncate(pendingReport.taskTitle)), MAX_FILES, fileCount),
         {
           parse_mode: 'HTML',
           reply_markup: new InlineKeyboard()
@@ -267,7 +268,7 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
         : ctx.from?.first_name ?? '';
       await ctx.api.sendMessage(
         adminId,
-        USER_REPORT_ADMIN_NOTIFY(report.id, pendingReport.taskTitle, userName, pendingReport.files.length),
+        USER_REPORT_ADMIN_NOTIFY(report.id, escapeHtml(truncate(pendingReport.taskTitle)), escapeHtml(truncate(userName)), pendingReport.files.length),
         {
           parse_mode: 'HTML',
           reply_markup: new InlineKeyboard().text('👁 Проверить', `admin:report:view:${report.id}`),
@@ -281,7 +282,7 @@ export async function handleReportSubmit(ctx: MyContext): Promise<void> {
   ctx.session.reportStep = undefined;
   ctx.session.pendingReport = undefined;
 
-  await ctx.editMessageText(USER_REPORT_SUBMITTED(pendingReport.taskTitle), {
+  await ctx.editMessageText(USER_REPORT_SUBMITTED(escapeHtml(truncate(pendingReport.taskTitle))), {
     parse_mode: 'HTML',
     reply_markup: new InlineKeyboard()
       .text(MENU.MY_TASKS, 'user:my_tasks')
@@ -331,13 +332,11 @@ export async function handleUserReports(ctx: MyContext): Promise<void> {
   }
   kb.text(KB.BACK, 'user:menu');
 
-  const lines = userReports
-    .map((r) => {
-      const emoji = REPORT_STATUS_EMOJI[r.status] ?? '•';
-      const statusRu = REPORT_STATUS_RU[r.status] ?? r.status;
-      return `${emoji} <b>${r.taskTitle}</b> — ${statusRu}`;
-    })
-    .join('\n');
+  const lines = buildBoundedList(userReports, (r) => {
+    const emoji = REPORT_STATUS_EMOJI[r.status] ?? '•';
+    const statusRu = REPORT_STATUS_RU[r.status] ?? r.status;
+    return `${emoji} <b>${escapeHtml(truncate(r.taskTitle))}</b> — ${statusRu}`;
+  });
 
   await ctx.editMessageText(
     `${USER_MY_REPORTS_HEADER(userReports.length)}\n\n${lines}`,
@@ -366,10 +365,10 @@ export async function handleUserReportDetail(ctx: MyContext, reportId: number): 
   const statusRu = REPORT_STATUS_RU[report.status] ?? report.status;
   const submittedDate = report.submittedAt.toLocaleDateString('ru-RU');
 
-  let text = USER_REPORT_DETAIL(emoji, report.taskTitle, statusRu, submittedDate, report.priceUah);
+  let text = USER_REPORT_DETAIL(emoji, escapeHtml(truncate(report.taskTitle)), statusRu, submittedDate, report.priceUah);
 
   if (report.status === 'rejected' && report.adminComment) {
-    text += USER_REPORT_ADMIN_COMMENT(report.adminComment);
+    text += USER_REPORT_ADMIN_COMMENT(escapeHtml(report.adminComment));
   }
 
   if (report.status === 'approved') {

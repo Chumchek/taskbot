@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { escapeHtml, truncate } from '../../../utils/html';
 import {
   getTaskMedia,
   addTaskMedia,
@@ -53,7 +54,7 @@ export async function handleAdminTaskMedia(ctx: MyContext, taskId: number): Prom
   }
   kb.text('◀ К заданию', `admin:task:view:${taskId}`);
 
-  await ctx.editMessageText(ADMIN_TASK_MEDIA_HEADER(task.title, files.length), {
+  await ctx.editMessageText(ADMIN_TASK_MEDIA_HEADER(escapeHtml(truncate(task.title)), files.length), {
     parse_mode: 'HTML',
     reply_markup: kb,
   });
@@ -74,7 +75,7 @@ export async function handleAdminTaskMediaStartUpload(
   ctx.session.pendingTaskMedia = { taskId, taskTitle: task.title, count: 0 };
 
   const sent = await ctx.editMessageText(
-    ADMIN_TASK_MEDIA_UPLOAD_PROMPT(task.title, MAX_TASK_MEDIA, 0),
+    ADMIN_TASK_MEDIA_UPLOAD_PROMPT(escapeHtml(truncate(task.title)), MAX_TASK_MEDIA, 0),
     {
       parse_mode: 'HTML',
       reply_markup: new InlineKeyboard()
@@ -145,7 +146,7 @@ async function processTaskMediaFile(ctx: MyContext, fileType: 'photo' | 'video')
       await ctx.api.editMessageText(
         ctx.chat!.id,
         pendingTaskMedia.promptMsgId,
-        ADMIN_TASK_MEDIA_UPLOAD_PROMPT(pendingTaskMedia.taskTitle, MAX_TASK_MEDIA, count),
+        ADMIN_TASK_MEDIA_UPLOAD_PROMPT(escapeHtml(truncate(pendingTaskMedia.taskTitle)), MAX_TASK_MEDIA, count),
         {
           parse_mode: 'HTML',
           reply_markup: new InlineKeyboard()
@@ -193,11 +194,11 @@ export async function handleAdminTaskMediaPreview(ctx: MyContext, taskId: number
         else await ctx.replyWithVideo(f.telegramFileId);
       } else {
         const url = await getPresignedUrl(f.storageKey, 600);
-        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     } catch {
       const url = await getPresignedUrl(f.storageKey, 600);
-      await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+      await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
     }
   }
 }

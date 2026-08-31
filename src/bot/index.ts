@@ -5,6 +5,7 @@ import { makeSessionStorage } from '../db/sessionStore';
 import { adminOnly } from './middleware/auth';
 import { approvedOnly } from './middleware/approvedOnly';
 import { isAdmin } from '../services/userService';
+import { GENERIC_ERROR, GENERIC_ERROR_ADMIN } from '../i18n/ru';
 
 // Handlers — registration
 import { handleStart } from './handlers/start';
@@ -150,6 +151,50 @@ import {
   handleProfileUpdateText,
 } from './handlers/user/profile';
 
+/**
+ * Tells whoever triggered the update that the handler failed.
+ *
+ * A toast alone is not enough: most handlers call answerCallbackQuery() before
+ * doing their real work, so by the time we get here the query is already
+ * answered and the toast is rejected — which is how a failing handler ends up
+ * looking like a button that does nothing at all. When the toast cannot be
+ * delivered, fall back to a normal message in the chat.
+ *
+ * Admins additionally get the update id so a report can be matched to a log
+ * line via: journalctl -u taskbot | grep "update <id>"
+ */
+async function reportFailure(ctx: MyContext, updateId: number): Promise<void> {
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.answerCallbackQuery({ text: GENERIC_ERROR, show_alert: true });
+      return;
+    } catch {
+      // Already answered, or the query expired — fall through to a message.
+    }
+  }
+
+  if (!ctx.chat) return;
+
+  // The admin lookup hits the DB, which may be the very thing that just failed —
+  // never let it stop the user from being told something went wrong.
+  let admin = false;
+  try {
+    const telegramId = ctx.from?.id.toString();
+    admin = !!telegramId && (await isAdmin(telegramId));
+  } catch {
+    // Fall back to the plain message.
+  }
+
+  try {
+    await ctx.reply(admin ? GENERIC_ERROR_ADMIN(updateId) : GENERIC_ERROR, {
+      parse_mode: 'HTML',
+    });
+  } catch (replyErr) {
+    // User blocked the bot, or the chat is gone — nothing more we can do.
+    console.error('[reportFailure] could not notify user', replyErr);
+  }
+}
+
 export function createBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(config.bot.token);
 
@@ -259,8 +304,16 @@ export function createBot(): Bot<MyContext> {
   // ── Admin payout callbacks ───────────────────────────────────────────────
   bot.callbackQuery('admin:payouts', adminOnly, handleAdminPayoutQueue);
 
-  bot.callbackQuery(/^admin:payout:view:(\d+)$/, adminOnly, (ctx) =>
-    handleAdminPayoutView(ctx, parseInt(ctx.match[1], 10)),
+  bot.callbackQuery('admin:payout:noop', adminOnly, (ctx) => ctx.answerCallbackQuery());
+
+  // Page is optional so the 2-part form still works in messages already sent
+  // to admins before this was deployed.
+  bot.callbackQuery(/^admin:payout:view:(\d+)(?::(\d+))?$/, adminOnly, (ctx) =>
+    handleAdminPayoutView(
+      ctx,
+      parseInt(ctx.match[1], 10),
+      ctx.match[2] ? parseInt(ctx.match[2], 10) : 0,
+    ),
   );
   bot.callbackQuery(/^admin:payout:confirm:(\d+)$/, adminOnly, (ctx) =>
     handleAdminPayoutConfirm(ctx, parseInt(ctx.match[1], 10)),
@@ -362,7 +415,12 @@ export function createBot(): Bot<MyContext> {
   bot.callbackQuery('user:report:cancel', handleReportCancel);
 
   // ── User balance ─────────────────────────────────────────────────────────
-  bot.callbackQuery('user:balance', handleUserBalance);
+  bot.callbackQuery('user:balance:noop', (ctx) => ctx.answerCallbackQuery());
+  bot.callbackQuery(/^user:balance:(\d+)$/, (ctx) =>
+    handleUserBalance(ctx, parseInt(ctx.match[1], 10)),
+  );
+  // Wrapped, not passed directly — grammY hands middleware `next` as the 2nd arg.
+  bot.callbackQuery('user:balance', (ctx) => handleUserBalance(ctx));
 
   // ── User proofs gallery ──────────────────────────────────────────────────
   bot.callbackQuery('user:proofs', handleUserProofGallery);
@@ -450,7 +508,7 @@ export function createBot(): Bot<MyContext> {
   });
 
   // ── Error handler ────────────────────────────────────────────────────────
-  bot.catch((err) => {
+  bot.catch(async (err) => {
     if (err.error instanceof GrammyError) {
       const desc = err.error.description;
       // Double-click or webhook retry delivered the same update twice — harmless
@@ -458,10 +516,7 @@ export function createBot(): Bot<MyContext> {
       if (desc.includes('query is too old')) return;
     }
     console.error(`[update ${err.ctx.update.update_id}]`, err.error);
-    // Always dismiss the loading spinner so the user doesn't get stuck
-    if (err.ctx.callbackQuery) {
-      err.ctx.answerCallbackQuery({ text: '⚠️ Произошла ошибка. Попробуйте ещё раз.', show_alert: false }).catch(() => {});
-    }
+    await reportFailure(err.ctx, err.ctx.update.update_id);
   });
 
   // Safety net — prevent any stray unhandled rejections from killing the process

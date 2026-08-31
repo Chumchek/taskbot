@@ -3,6 +3,7 @@ import { users } from '../../db/schema';
 import { encrypt, maskCard } from '../../services/crypto';
 import { getAllAdminIds, saveAdminNotification } from '../../services/userService';
 import { MyContext } from '../context';
+import { escapeHtml, truncate } from '../../utils/html';
 import {
   approveUserKeyboard,
   registrationStep1Keyboard,
@@ -62,13 +63,15 @@ export async function completeRegistration(
   ctx.session.step = 'idle';
   ctx.session.pendingBinanceId = undefined;
 
-  const userName = ctx.from?.username
-    ? `@${ctx.from.username}`
-    : ctx.from?.first_name ?? 'Unknown';
+  const userName = escapeHtml(
+    truncate(
+      ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name ?? 'Unknown',
+    ),
+  );
 
   const paymentLines = [
-    binanceId ? `Binance ID: <code>${binanceId}</code>` : null,
-    cardNumber ? `Карта: <code>${maskCard(cardNumber)}</code>` : null,
+    binanceId ? `Binance ID: <code>${escapeHtml(binanceId)}</code>` : null,
+    cardNumber ? `Карта: <code>${escapeHtml(maskCard(cardNumber))}</code>` : null,
   ]
     .filter(Boolean)
     .join('\n');

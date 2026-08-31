@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { buildBoundedList, escapeHtml, escapeOptional, truncate, MAX_DESCRIPTION } from '../../../utils/html';
 import { mainMenuKeyboard, userTaskDetailKeyboard } from '../../keyboards';
 import {
   claimTask,
@@ -154,8 +155,9 @@ export async function handleUserTaskView(ctx: MyContext, taskId: number): Promis
 
   const dl = deadlineLabel(task.deadlineHours);
   const text = USER_TASK_DETAIL(
-    task.title, task.description, task.link, task.priceUah,
-    task.slotsAvailable, dl, alreadyClaimed, task.packageName,
+    escapeHtml(truncate(task.title)), escapeOptional(task.description, MAX_DESCRIPTION),
+    escapeHtml(task.link), task.priceUah,
+    task.slotsAvailable, dl, alreadyClaimed, escapeOptional(task.packageName),
   );
 
   const kb = userTaskDetailKeyboard(task.id, alreadyClaimed, task.slotsAvailable > 0);
@@ -235,13 +237,11 @@ export async function handleUserMyTasks(ctx: MyContext): Promise<void> {
     return;
   }
 
-  const lines = assignments
-    .map((a) => {
-      const emoji = a.hasPendingReport ? '🔍' : (TASK_STATUS_EMOJI[a.status] ?? '•');
-      const statusRu = a.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[a.status] ?? a.status);
-      return `${emoji} <b>${a.task.title}</b> — ${a.task.priceUah} грн [${statusRu}]`;
-    })
-    .join('\n');
+  const lines = buildBoundedList(assignments, (a) => {
+    const emoji = a.hasPendingReport ? '🔍' : (TASK_STATUS_EMOJI[a.status] ?? '•');
+    const statusRu = a.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[a.status] ?? a.status);
+    return `${emoji} <b>${escapeHtml(truncate(a.task.title))}</b> — ${a.task.priceUah} грн [${statusRu}]`;
+  });
 
   const kb = new InlineKeyboard();
   for (const a of assignments) {
@@ -287,7 +287,9 @@ export async function handleUserAssignmentView(
   const statusRu = assignment.hasPendingReport ? 'на проверке' : (TASK_STATUS_RU[assignment.status] ?? assignment.status);
 
   const text = USER_ASSIGNMENT_DETAIL(
-    task.title, task.description, task.link, task.priceUah, deadline, statusEmoji, statusRu, task.packageName,
+    escapeHtml(truncate(task.title)), escapeOptional(task.description, MAX_DESCRIPTION),
+    escapeHtml(task.link), task.priceUah, deadline, statusEmoji, statusRu,
+    escapeOptional(task.packageName),
   );
 
   const kb = new InlineKeyboard();
@@ -324,11 +326,11 @@ export async function handleUserTaskHelp(ctx: MyContext, taskId: number): Promis
         else await ctx.replyWithVideo(f.telegramFileId);
       } else {
         const url = await getPresignedUrl(f.storageKey, 3600);
-        await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+        await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
       }
     } catch {
       const url = await getPresignedUrl(f.storageKey, 3600);
-      await ctx.reply(`🔗 <a href="${url}">Открыть файл</a>`, { parse_mode: 'HTML' });
+      await ctx.reply(`🔗 <a href="${escapeHtml(url)}">Открыть файл</a>`, { parse_mode: 'HTML' });
     }
   }
 }

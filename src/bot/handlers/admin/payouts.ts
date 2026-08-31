@@ -2,6 +2,7 @@ import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
 import { adminMenuKeyboard } from '../../keyboards';
 import { getUserByTelegramId } from '../../../services/userService';
+import { buildBoundedList, escapeHtml, truncate } from '../../../utils/html';
 import {
   getDecryptedCard,
   getPaymentInfo,
@@ -29,10 +30,22 @@ import {
   ADMIN_PAYOUT_NO_CARD,
 } from '../../../i18n/ru';
 
+
+const TASKS_PAGE_SIZE = 10;
+
+function displayName(user: { username: string | null; firstName: string | null; telegramId: string }): string {
+  return user.username ? `@${user.username}` : user.firstName ?? user.telegramId;
+}
+
 // ── Payout queue list ───────────────────────────────────────────────────────
 
 export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
+  await renderPayoutQueue(ctx);
+}
+
+/** Renders the queue without touching the callback query — see handleAdminPayoutView. */
+async function renderPayoutQueue(ctx: MyContext): Promise<void> {
   ctx.session.pendingPayoutUserId = undefined;
 
   const queue = await getPayoutQueue();
@@ -47,9 +60,7 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
 
   const kb = new InlineKeyboard();
   for (const item of queue) {
-    const name = item.user.username
-      ? `@${item.user.username}`
-      : item.user.firstName ?? item.user.telegramId;
+    const name = displayName(item.user);
     kb.text(
       `👤 ${name} — ${parseFloat(item.balance).toFixed(2)} грн`,
       `admin:payout:view:${item.user.id}`,
@@ -65,53 +76,83 @@ export async function handleAdminPayoutQueue(ctx: MyContext): Promise<void> {
 
 // ── User payout detail ──────────────────────────────────────────────────────
 
-export async function handleAdminPayoutView(ctx: MyContext, userId: number): Promise<void> {
-  await ctx.answerCallbackQuery();
+export async function handleAdminPayoutView(
+  ctx: MyContext,
+  userId: number,
+  page = 0,
+): Promise<void> {
   ctx.session.pendingPayoutUserId = undefined;
 
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
 
   if (!item) {
+    // Answer once, with the alert — a second answerCallbackQuery on an
+    // already-answered query throws and leaves the admin with no feedback.
     await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_USER_NOT_FOUND, show_alert: true });
-    await handleAdminPayoutQueue(ctx);
+    await renderPayoutQueue(ctx);
     return;
   }
 
+  await ctx.answerCallbackQuery();
+
   const { user, balance } = item;
-  const name = user.username ? `@${user.username}` : user.firstName ?? user.telegramId;
+  const name = escapeHtml(displayName(user));
   const paymentInfo = getPaymentInfo(user);
   const completedTasks = await getUnpaidCompletedTasks(user.id);
 
   const paymentLines = [
     paymentInfo.binanceId
-      ? `• Binance ID: <code>${paymentInfo.binanceId}</code>`
+      ? `• Binance ID: <code>${escapeHtml(paymentInfo.binanceId)}</code>`
       : null,
     paymentInfo.maskedCard
-      ? `• Карта: <code>${paymentInfo.maskedCard}</code>`
+      ? `• Карта: <code>${escapeHtml(paymentInfo.maskedCard)}</code>`
       : null,
   ]
     .filter(Boolean)
     .join('\n');
 
+  const totalPages = Math.max(1, Math.ceil(completedTasks.length / TASKS_PAGE_SIZE));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const pageTasks = completedTasks.slice(
+    safePage * TASKS_PAGE_SIZE,
+    (safePage + 1) * TASKS_PAGE_SIZE,
+  );
+
+  // One page always fits, but titles are unbounded `text` — keep the budget
+  // guard so a few very long ones still cannot trip MESSAGE_TOO_LONG.
   const taskLines =
-    completedTasks.length > 0
-      ? completedTasks
-          .map((t) => {
+    pageTasks.length > 0
+      ? buildBoundedList(
+          pageTasks,
+          (t) => {
             const date = t.completedAt
               ? new Date(t.completedAt).toLocaleDateString('ru-RU')
               : '';
-            return `• ${t.taskTitle} — ${t.priceUah} грн${date ? ` (${date})` : ''}`;
-          })
-          .join('\n')
+            return `• ${escapeHtml(truncate(t.taskTitle))} — ${t.priceUah} грн${date ? ` (${date})` : ''}`;
+          },
+          { maxRows: TASKS_PAGE_SIZE },
+        )
       : ADMIN_PAYOUT_NO_TASK_DETAILS;
 
-  const kb = new InlineKeyboard()
-    .text(
-      KB.MARK_PAID(parseFloat(balance).toFixed(2)),
-      `admin:payout:confirm:${user.id}`,
-    )
-    .row();
+  const kb = new InlineKeyboard();
+
+  // Task pagination row — same shape as the admin task list
+  if (totalPages > 1) {
+    if (safePage > 0) {
+      kb.text(KB.PAGE_PREV, `admin:payout:view:${user.id}:${safePage - 1}`);
+    }
+    kb.text(`${safePage + 1} / ${totalPages}`, 'admin:payout:noop');
+    if (safePage < totalPages - 1) {
+      kb.text(KB.PAGE_NEXT, `admin:payout:view:${user.id}:${safePage + 1}`);
+    }
+    kb.row();
+  }
+
+  kb.text(
+    KB.MARK_PAID(parseFloat(balance).toFixed(2)),
+    `admin:payout:confirm:${user.id}`,
+  ).row();
 
   if (paymentInfo.hasEncryptedCard) {
     kb.text(KB.SHOW_FULL_CARD, `admin:payout:show_card:${user.id}`).row();
@@ -120,7 +161,14 @@ export async function handleAdminPayoutView(ctx: MyContext, userId: number): Pro
   kb.text(KB.BACK_QUEUE, 'admin:payouts');
 
   await ctx.editMessageText(
-    ADMIN_PAYOUT_DETAIL(name, user.telegramId, parseFloat(balance).toFixed(2), paymentLines, taskLines),
+    ADMIN_PAYOUT_DETAIL(
+      name,
+      escapeHtml(user.telegramId),
+      parseFloat(balance).toFixed(2),
+      paymentLines,
+      taskLines,
+      completedTasks.length,
+    ),
     { parse_mode: 'HTML', reply_markup: kb },
   );
 }
@@ -128,8 +176,6 @@ export async function handleAdminPayoutView(ctx: MyContext, userId: number): Pro
 // ── Confirm payout ──────────────────────────────────────────────────────────
 
 export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): Promise<void> {
-  await ctx.answerCallbackQuery();
-
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
   if (!item) {
@@ -137,9 +183,9 @@ export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): 
     return;
   }
 
-  const name = item.user.username
-    ? `@${item.user.username}`
-    : item.user.firstName ?? item.user.telegramId;
+  await ctx.answerCallbackQuery();
+
+  const name = escapeHtml(displayName(item.user));
 
   await ctx.editMessageText(
     ADMIN_PAYOUT_CONFIRM(name, parseFloat(item.balance).toFixed(2)),
@@ -155,8 +201,6 @@ export async function handleAdminPayoutConfirm(ctx: MyContext, userId: number): 
 // ── Mark as paid — ask for proof screenshot ─────────────────────────────────
 
 export async function handleAdminPayoutMarkPaid(ctx: MyContext, userId: number): Promise<void> {
-  await ctx.answerCallbackQuery();
-
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
 
@@ -165,9 +209,9 @@ export async function handleAdminPayoutMarkPaid(ctx: MyContext, userId: number):
     return;
   }
 
-  const name = item.user.username
-    ? `@${item.user.username}`
-    : item.user.firstName ?? item.user.telegramId;
+  await ctx.answerCallbackQuery();
+
+  const name = escapeHtml(displayName(item.user));
 
   ctx.session.pendingPayoutUserId = userId;
 
@@ -186,7 +230,8 @@ export async function handleAdminPayoutMarkPaid(ctx: MyContext, userId: number):
 // ── Skip proof — record payout without screenshot ───────────────────────────
 
 export async function handleAdminPayoutProofSkip(ctx: MyContext, userId: number): Promise<void> {
-  await ctx.answerCallbackQuery();
+  // finalisePayout answers the callback query itself (with the success toast or
+  // the failure alert) — answering here too would make that second call throw.
   ctx.session.pendingPayoutUserId = undefined;
   await finalisePayout(ctx, userId);
 }
@@ -228,7 +273,7 @@ async function finalisePayout(
   }
 
   const successText = ADMIN_PAYOUT_RECORDED_TEXT(
-    result.payoutId, result.userName, parseFloat(result.amount).toFixed(2),
+    result.payoutId, escapeHtml(result.userName), parseFloat(result.amount).toFixed(2),
   );
   const successKb = new InlineKeyboard()
     .text(KB.BACK_QUEUE, 'admin:payouts')
@@ -263,8 +308,6 @@ async function finalisePayout(
 // ── Show full card (auto-deletes after 60s) ─────────────────────────────────
 
 export async function handleAdminPayoutShowCard(ctx: MyContext, userId: number): Promise<void> {
-  await ctx.answerCallbackQuery();
-
   const queue = await getPayoutQueue();
   const item = queue.find((q) => q.user.id === userId);
 
@@ -279,6 +322,8 @@ export async function handleAdminPayoutShowCard(ctx: MyContext, userId: number):
     await ctx.answerCallbackQuery({ text: ADMIN_PAYOUT_NO_CARD, show_alert: true });
     return;
   }
+
+  await ctx.answerCallbackQuery();
 
   const formatted = card.replace(/(\d{4})/g, '$1 ').trim();
 

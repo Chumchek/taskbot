@@ -1,8 +1,9 @@
 import { MyContext } from '../../context';
+import { escapeHtml, truncate } from '../../../utils/html';
 import { adminMenuKeyboard, approveUserKeyboard } from '../../keyboards';
 import { setAdminCommands } from '../../setupCommands';
 import { approveUser, banUser, deleteAdminNotifications, getAdminNotifications, getPendingUsers, promoteUser, rejectUser, unbanUser } from '../../../services/userService';
-import { decrypt, maskCard } from '../../../services/crypto';
+import { safeMaskCard } from '../../../services/crypto';
 import {
   ADMIN_NO_PENDING_USERS,
   ADMIN_PENDING_USERS_HEADER,
@@ -25,6 +26,13 @@ import {
   REG_REJECTED_NOTIFY,
 } from '../../../i18n/ru';
 
+function displayName(
+  user: { username: string | null; firstName: string | null },
+  fallback: string,
+): string {
+  return escapeHtml(truncate(user.username ? `@${user.username}` : user.firstName ?? fallback));
+}
+
 export async function handlePendingUsers(ctx: MyContext): Promise<void> {
   await ctx.answerCallbackQuery();
 
@@ -42,18 +50,17 @@ export async function handlePendingUsers(ctx: MyContext): Promise<void> {
   });
 
   for (const user of pending) {
-    const name = user.username ? `@${user.username}` : user.firstName ?? `ID ${user.telegramId}`;
+    const name = displayName(user, `ID ${user.telegramId}`);
+    const maskedCard = safeMaskCard(user.cardEncrypted);
     const paymentLines = [
-      user.binanceId ? `Binance: <code>${user.binanceId}</code>` : null,
-      user.cardEncrypted
-        ? `Карта: <code>${maskCard(decrypt(user.cardEncrypted))}</code>`
-        : null,
+      user.binanceId ? `Binance: <code>${escapeHtml(user.binanceId)}</code>` : null,
+      maskedCard ? `Карта: <code>${escapeHtml(maskedCard)}</code>` : null,
     ]
       .filter(Boolean)
       .join('\n');
 
     await ctx.reply(
-      `👤 <b>${name}</b>\nTelegram ID: <code>${user.telegramId}</code>\n${paymentLines || ADMIN_USER_NO_PAYMENT}`,
+      `👤 <b>${name}</b>\nTelegram ID: <code>${escapeHtml(user.telegramId)}</code>\n${paymentLines || ADMIN_USER_NO_PAYMENT}`,
       { parse_mode: 'HTML', reply_markup: approveUserKeyboard(user.telegramId) },
     );
   }
@@ -69,7 +76,7 @@ export async function handleApproveUser(ctx: MyContext, telegramId: string): Pro
   }
 
   await ctx.answerCallbackQuery({ text: '✅ Одобрено!' });
-  const name = user.username ? `@${user.username}` : user.firstName ?? telegramId;
+  const name = displayName(user, telegramId);
   const resultText = ADMIN_USER_APPROVED(name);
 
   await ctx.editMessageText(resultText, { parse_mode: 'HTML' });
@@ -105,7 +112,7 @@ export async function handleRejectUser(ctx: MyContext, telegramId: string): Prom
   }
 
   await ctx.answerCallbackQuery({ text: '❌ Отклонено' });
-  const name = user.username ? `@${user.username}` : user.firstName ?? telegramId;
+  const name = displayName(user, telegramId);
   const resultText = ADMIN_USER_REJECTED(name);
 
   await ctx.editMessageText(resultText, { parse_mode: 'HTML' });
@@ -142,11 +149,11 @@ export async function handleBanCommand(ctx: MyContext): Promise<void> {
   const user = await banUser(args);
 
   if (!user) {
-    await ctx.reply(ADMIN_BAN_NOT_FOUND(args), { parse_mode: 'HTML' });
+    await ctx.reply(ADMIN_BAN_NOT_FOUND(escapeHtml(truncate(args))), { parse_mode: 'HTML' });
     return;
   }
 
-  const name = user.username ? `@${user.username}` : user.firstName ?? args;
+  const name = displayName(user, args);
   await ctx.reply(ADMIN_BANNED(name), { parse_mode: 'HTML' });
 
   try {
@@ -167,11 +174,11 @@ export async function handleUnbanCommand(ctx: MyContext): Promise<void> {
   const user = await unbanUser(args);
 
   if (!user) {
-    await ctx.reply(ADMIN_UNBAN_NOT_FOUND(args), { parse_mode: 'HTML' });
+    await ctx.reply(ADMIN_UNBAN_NOT_FOUND(escapeHtml(truncate(args))), { parse_mode: 'HTML' });
     return;
   }
 
-  const name = user.username ? `@${user.username}` : user.firstName ?? args;
+  const name = displayName(user, args);
   await ctx.reply(ADMIN_UNBANNED(name), { parse_mode: 'HTML' });
 
   try {
@@ -192,11 +199,11 @@ export async function handlePromoteCommand(ctx: MyContext): Promise<void> {
   const user = await promoteUser(args);
 
   if (!user) {
-    await ctx.reply(ADMIN_PROMOTE_NOT_FOUND(args), { parse_mode: 'HTML' });
+    await ctx.reply(ADMIN_PROMOTE_NOT_FOUND(escapeHtml(truncate(args))), { parse_mode: 'HTML' });
     return;
   }
 
-  const name = user.username ? `@${user.username}` : user.firstName ?? args;
+  const name = displayName(user, args);
   await ctx.reply(ADMIN_PROMOTED(name), { parse_mode: 'HTML' });
 
   setAdminCommands(ctx.api, user.telegramId).catch(() => {});

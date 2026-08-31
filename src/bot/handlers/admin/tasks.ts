@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { MyContext } from '../../context';
+import { escapeHtml, escapeOptional, truncate, MAX_DESCRIPTION } from '../../../utils/html';
 import { adminMenuKeyboard, adminTaskDetailKeyboard, adminTaskCategoryKeyboard, adminTaskSearchResultsKeyboard } from '../../keyboards';
 import {
   createTask,
@@ -173,9 +174,10 @@ export async function handleAdminTaskView(ctx: MyContext, taskId: number): Promi
   const expiresAt = taskExpiresAtLabel(task);
   const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   const text = ADMIN_TASK_DETAIL(
-    task.title, task.description, task.link, task.priceUah,
+    escapeHtml(truncate(task.title)), escapeOptional(task.description, MAX_DESCRIPTION),
+    escapeHtml(task.link), task.priceUah,
     task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
-    categoryLabel, task.packageName ?? null,
+    categoryLabel, escapeOptional(task.packageName),
   );
 
   await ctx.editMessageText(text, {
@@ -205,9 +207,10 @@ export async function handleAdminTaskToggle(ctx: MyContext, taskId: number): Pro
   const expiresAt = taskExpiresAtLabel(task);
   const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   const text = ADMIN_TASK_DETAIL(
-    task.title, task.description, task.link, task.priceUah,
+    escapeHtml(truncate(task.title)), escapeOptional(task.description, MAX_DESCRIPTION),
+    escapeHtml(task.link), task.priceUah,
     task.slotsAvailable, task.slotsTotal, dl, status, expiresAt,
-    categoryLabel, task.packageName ?? null,
+    categoryLabel, escapeOptional(task.packageName),
   );
 
   await ctx.editMessageText(text, {
@@ -228,7 +231,7 @@ export async function handleAdminTaskDeleteConfirm(ctx: MyContext, taskId: numbe
     return;
   }
 
-  await ctx.editMessageText(ADMIN_TASK_DELETE_CONFIRM(task.title), {
+  await ctx.editMessageText(ADMIN_TASK_DELETE_CONFIRM(escapeHtml(truncate(task.title))), {
     parse_mode: 'HTML',
     reply_markup: new InlineKeyboard()
       .text(KB.YES_DELETE, `admin:task:delete:${taskId}`)
@@ -427,9 +430,11 @@ export async function handleTaskCreationText(ctx: MyContext): Promise<void> {
     const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
     await ctx.reply(
       ADMIN_TASK_SUMMARY(
-        task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
+        escapeHtml(truncate(task.title!)),
+        escapeOptional(task.description, MAX_DESCRIPTION) ?? undefined,
+        escapeHtml(task.link!), task.priceUah!, task.slotsTotal!,
         deadlineLabel(task.deadlineHours!), deadlineLabel(hours),
-        categoryLabel, task.packageName ?? null,
+        categoryLabel, escapeOptional(task.packageName),
       ),
       {
         parse_mode: 'HTML',
@@ -463,9 +468,11 @@ export async function handleAdminTaskSkipExpiry(ctx: MyContext): Promise<void> {
   const categoryLabel = task.category ? TASK_CATEGORY_LABELS[task.category] : null;
   await ctx.editMessageText(
     ADMIN_TASK_SUMMARY(
-      task.title!, task.description, task.link!, task.priceUah!, task.slotsTotal!,
+      escapeHtml(truncate(task.title!)),
+      escapeOptional(task.description, MAX_DESCRIPTION) ?? undefined,
+      escapeHtml(task.link!), task.priceUah!, task.slotsTotal!,
       deadlineLabel(task.deadlineHours!), null,
-      categoryLabel, task.packageName ?? null,
+      categoryLabel, escapeOptional(task.packageName),
     ),
     {
       parse_mode: 'HTML',
@@ -514,7 +521,7 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
   ctx.session.taskStep = undefined;
   ctx.session.pendingTask = undefined;
 
-  await ctx.editMessageText(ADMIN_TASK_CREATED(task.title, task.priceUah, task.slotsTotal), {
+  await ctx.editMessageText(ADMIN_TASK_CREATED(escapeHtml(truncate(task.title)), task.priceUah, task.slotsTotal), {
     parse_mode: 'HTML',
     reply_markup: new InlineKeyboard()
       .text(KB.VIEW_ALL_TASKS, 'admin:tasks')
@@ -524,7 +531,7 @@ export async function handleAdminTaskConfirmCreate(ctx: MyContext): Promise<void
 
   // Broadcast to all approved users — fire-and-forget, errors are non-critical
   getApprovedUsers().then((users) => {
-    const text = NEW_TASK_NOTIFY(task.title, task.priceUah);
+    const text = NEW_TASK_NOTIFY(escapeHtml(truncate(task.title)), task.priceUah);
     for (const user of users) {
       ctx.api.sendMessage(user.telegramId, text, { parse_mode: 'HTML' }).catch(() => {});
     }
